@@ -2,6 +2,12 @@
 
 Este documento detalla los pasos exactos para probar la aplicación localmente en tiempo real y para preparar, construir y desplegar MuniConecta en Google Cloud Platform (GCP) utilizando Docker, Artifact Registry y Terraform.
 
+## 🚀 Demo en Vivo y Presentación
+- **Sitio Web Oficial:** [https://v0-municonecta-landing-page.vercel.app](https://v0-municonecta-landing-page.vercel.app)
+- **Probar el Bot en Telegram:** [@MuniConecta_Bot](https://t.me/MuniConecta_Bot)
+
+---
+
 ## Desarrollo y Pruebas Locales (Modo Polling)
 
 Si quieres probar el bot localmente en tiempo real sin desplegarlo en Google Cloud Platform, puedes hacerlo utilizando el script de Polling local. Esto leerá las actualizaciones directamente desde la API de Telegram sin necesidad de configurar Webhooks ni HTTPS locales.
