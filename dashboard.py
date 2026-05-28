@@ -141,7 +141,7 @@ with col_left:
     SUPABASE_URL = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
     
-    if st.button("🔄 Sincronizar Base de Datos"):
+    if st.button("🔄 Actualizar en Tiempo Real", use_container_width=True):
         if SUPABASE_URL and SUPABASE_KEY:
             try:
                 import httpx

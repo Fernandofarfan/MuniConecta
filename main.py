@@ -160,9 +160,10 @@ async def telegram_webhook(request: Request):
                         headers = {
                             "apikey": SUPABASE_KEY,
                             "Authorization": f"Bearer {SUPABASE_KEY}",
-                            "Content-Type": "application/json"
+                            "Content-Type": "application/json",
+                            "Prefer": "return=minimal"
                         }
-                        payload = {"ubicacion": "Reporte de Telegram", "detalle": user_text}
+                        payload = {"ubicacion": "Reporte de Telegram", "detalle": user_text if user_text else "Reporte con imagen"}
                         sb_url = f"{SUPABASE_URL}/rest/v1/reclamos"
                         sb_res = await sb_client.post(sb_url, headers=headers, json=payload)
                         logger.info(f"Supabase status: {sb_res.status_code}")
