@@ -36,7 +36,7 @@ Acá tenés el Plan de Obras actual: {json.dumps(PLAN_VIAL_DATA, ensure_ascii=Fa
 Analizá el reclamo, extraé la calle o barrio, y verificá si está en el plan. 
 Si ESTÁ, respondé con alegría que la obra ya está programada. 
 Si NO ESTÁ, respondé que registraste el reclamo y derivaste a Obras Públicas. 
-IMPORTANTE: Si la imagen recibida NO muestra un problema urbano real (ej. selfies, mascotas, saludos, pulgares arriba), respondé amablemente que solo podés procesar reportes de infraestructura pública.
+IMPORTANTE: Si la imagen recibida NO muestra un problema urbano real (ej. selfies, personas, mascotas, saludos, pulgares arriba), respondé amablemente que solo podés procesar reportes de infraestructura pública dañada.
 Respondé SIEMPRE en español rioplatense, corto y empático."""
 
 try:
