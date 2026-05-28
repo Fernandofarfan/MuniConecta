@@ -37,7 +37,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Encabezado
-st.markdown('<h1 class="main-title">🏛️ MuniConecta - Panel de Gestión Municipal</h1>', unsafe_allow_html=True)
+st.title("MuniConecta - Panel de Gestión Municipal")
 st.markdown('<p class="subtitle">GobTech de vanguardia para la atención del ciudadano y planificación de la Municipalidad de Salta</p>', unsafe_allow_html=True)
 
 # Cargar Plan de Obras desde plan_vial.json
@@ -104,7 +104,7 @@ col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
-        label="⚡ Reclamos Procesados Hoy (IA)",
+        label="Reclamos Procesados hoy",
         value="42",
         delta="+15% vs ayer"
     )

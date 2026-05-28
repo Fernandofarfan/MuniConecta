@@ -149,13 +149,7 @@ async def telegram_webhook(request: Request):
             
             # Enviar una copia del reporte al canal privado de la municipalidad (Human-in-the-Loop)
             if MUNICIPAL_CHANNEL_ID:
-                try:
-                    target_channel = int(MUNICIPAL_CHANNEL_ID)
-                except ValueError:
-                    target_channel = MUNICIPAL_CHANNEL_ID
-                
-                report_content = f"Nuevo Reporte: {user_text if user_text else '(Reporte con imagen sin texto)'}"
-                await send_telegram_message(target_channel, report_content)
+                await send_telegram_message(MUNICIPAL_CHANNEL_ID, f"Nuevo Reporte: {user_text}")
             
     except Exception as e:
         logger.error(f"Error general en webhook: {e}")
