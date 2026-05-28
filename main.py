@@ -115,7 +115,10 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
         hora_inicio_str = registro.get("hora_inicio")
         
         # Procesar fechas y tiempos
-        hora_inicio = datetime.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
+        try:
+            hora_inicio = datetime.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
+        except ValueError:
+            hora_inicio = datetime.now(TZ_ARG)
         hora_fin = datetime.now(TZ_ARG)
         
         delta_tiempo = hora_fin - hora_inicio

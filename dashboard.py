@@ -74,6 +74,7 @@ st.markdown("""
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 def obtener_headers_supabase():
     return {
@@ -130,7 +131,7 @@ with st.sidebar:
                 with st.spinner("Registrando..."):
                     try:
                         res = requests.post(
-                            "https://municonecta-service-728832414144.us-central1.run.app/iniciar_estacionamiento",
+                            f"{API_URL}/iniciar_estacionamiento",
                             json={"patente": patente, "tipo_vehiculo": tipo, "legajo_permisionario": legajo}
                         )
                         if res.status_code == 200:
@@ -155,7 +156,7 @@ with st.sidebar:
                 with st.spinner("Calculando..."):
                     try:
                         res = requests.post(
-                            "https://municonecta-service-728832414144.us-central1.run.app/calcular_cobro",
+                            f"{API_URL}/calcular_cobro",
                             json={"patente": patente_cobro, "metodo_pago": metodo}
                         )
                         if res.status_code == 200:
