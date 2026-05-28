@@ -6,3 +6,4 @@ pandas
 plotly
 google-generativeai
 numpy
+python-telegram-bot

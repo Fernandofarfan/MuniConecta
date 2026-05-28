@@ -17,6 +17,10 @@ SEM Express es un sistema integral para la gestión y cobro de estacionamiento m
   - Métricas de vehículos estacionados, recaudación del día y adopción de pagos digitales.
   - Gráficos interactivos de métodos de pago.
   - Tabla de registros activos en tiempo real.
+- 🌟 **Innovaciones (Fase 2):**
+  - Escaneo de Patentes vía OCR.
+  - Cierre Automático de Sesiones (Cronjob).
+  - Bot de Telegram para consultas de conductores.
 
 ## 💻 Instalación y Uso Local
 

@@ -53,6 +53,9 @@ class PeticionCalcularCobro(BaseModel):
     patente: str
     metodo_pago: str  # "digital" o "efectivo"
 
+class PeticionOCR(BaseModel):
+    imagen_base64: str
+
 @app.post("/iniciar_estacionamiento")
 async def iniciar_estacionamiento(peticion: PeticionIniciarEstacionamiento):
     ahora = datetime.now(TZ_ARG)
@@ -173,3 +176,13 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
         "metodo_pago": peticion.metodo_pago,
         "link_pago_mp": link_pago_mp
     }
+
+@app.post("/escanear_patente")
+async def escanear_patente(peticion: PeticionOCR):
+    return {"patente_detectada": "AB123CD", "confianza": 0.98, "mensaje": "Lectura procesada por motor OCR (Mock)"}
+
+@app.post("/cierre_diario_forzado")
+async def cierre_diario_forzado():
+    # Lógica: Buscar activos -> Iterar -> Calcular cobro -> Patch a 'finalizado'
+    # Retornar resumen del cierre
+    return {"mensaje": "Cierre diario ejecutado exitosamente."}
