@@ -1,6 +1,37 @@
-# MuniConecta - Guía de Despliegue en GCP
+# MuniConecta - Guía de Despliegue y Pruebas
 
-Este documento detalla los pasos exactos para preparar, construir y desplegar la aplicación MuniConecta en Google Cloud Platform (GCP) utilizando Docker, Artifact Registry y Terraform.
+Este documento detalla los pasos exactos para probar la aplicación localmente en tiempo real y para preparar, construir y desplegar MuniConecta en Google Cloud Platform (GCP) utilizando Docker, Artifact Registry y Terraform.
+
+## Desarrollo y Pruebas Locales (Modo Polling)
+
+Si quieres probar el bot localmente en tiempo real sin desplegarlo en Google Cloud Platform, puedes hacerlo utilizando el script de Polling local. Esto leerá las actualizaciones directamente desde la API de Telegram sin necesidad de configurar Webhooks ni HTTPS locales.
+
+### 1. Configurar el archivo `.env`
+Asegúrate de tener un archivo `.env` en la raíz del proyecto con las siguientes variables:
+```env
+TELEGRAM_BOT_TOKEN=tu_token_de_telegram
+GEMINI_API_KEY=tu_api_key_de_gemini
+```
+
+### 2. Ejecutar el bot localmente
+Ejecuta el script `local_poll.py` utilizando tu entorno virtual:
+
+**En Windows:**
+```powershell
+.\venv\Scripts\python.exe local_poll.py
+```
+
+**En Linux/macOS:**
+```bash
+source venv/bin/activate
+python local_poll.py
+```
+
+*Nota: Este script borrará temporalmente cualquier Webhook configurado en Telegram para que las actualizaciones se reciban directamente en tu máquina.*
+
+---
+
+## Despliegue en GCP (Producción)
 
 ## Requisitos Previos
 
