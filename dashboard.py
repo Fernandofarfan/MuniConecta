@@ -136,7 +136,7 @@ st.markdown("---")
 col_left, col_right = st.columns([3, 2])
 
 with col_left:
-    st.markdown('<div class="card"><h3>ðŸ“¥ Reclamos Ciudadanos Recibidos (Últimos Reportes)</h3></div>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><h3>📥 Reclamos Ciudadanos Recibidos (Últimos Reportes)</h3></div>', unsafe_allow_html=True)
     
     SUPABASE_URL = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
