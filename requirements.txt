@@ -5,3 +5,4 @@ google-generativeai
 python-dotenv
 streamlit
 pandas
+jsonschema<4.18.0
