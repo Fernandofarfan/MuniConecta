@@ -21,18 +21,6 @@ variable "region" {
   default     = "us-central1"
 }
 
-variable "telegram_bot_token" {
-  description = "Telegram Bot Token"
-  type        = string
-  sensitive   = true
-}
-
-variable "gemini_api_key" {
-  description = "Gemini API Key"
-  type        = string
-  sensitive   = true
-}
-
 variable "docker_image" {
   description = "Docker image URL in Artifact Registry"
   type        = string
@@ -45,22 +33,12 @@ resource "google_cloud_run_v2_service" "municonecta_service" {
 
   template {
     containers {
-      # Reemplazar con la imagen de tu contenedor Docker subido a Artifact Registry
       image = var.docker_image 
-      
-      env {
-        name  = "TELEGRAM_BOT_TOKEN"
-        value = var.telegram_bot_token
-      }
-      env {
-        name  = "GEMINI_API_KEY"
-        value = var.gemini_api_key
-      }
     }
   }
 }
 
-# Permite acceso público no autenticado para recibir los webhooks de Telegram
+# Permite acceso público no autenticado
 resource "google_cloud_run_service_iam_member" "public_access" {
   location = google_cloud_run_v2_service.municonecta_service.location
   project  = google_cloud_run_v2_service.municonecta_service.project

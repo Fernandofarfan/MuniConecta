@@ -1,9 +1,6 @@
 fastapi
 uvicorn
 httpx
-google-generativeai
-python-dotenv
 streamlit
 pandas
-altair>=5.0.0
-streamlit-autorefresh
+plotly
