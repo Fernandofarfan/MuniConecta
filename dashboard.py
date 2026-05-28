@@ -124,6 +124,23 @@ create policy "Permitir todo a anon" on public.estacionamientos for all to anon 
 with st.sidebar:
     st.header("📱 App Permisionario")
     st.markdown("Simulador de la app en calle")
+    st.link_button("💬 Abrir Bot en Telegram", "https://t.me/MuniConecta_Bot", use_container_width=True)
+    
+    st.subheader("📸 Escáner OCR Inteligente")
+    if st.button("📷 Simular Lectura de Patente"):
+        with st.spinner("Analizando imagen..."):
+            try:
+                res = requests.post(f"{API_URL}/escanear_patente", json={"imagen_base64": "mock_data"})
+                if res.status_code == 200:
+                    data = res.json()
+                    st.success(f"✅ Patente: {data['patente_detectada']} (Confianza: {data['confianza']*100}%)")
+                    st.info(data['mensaje'])
+                else:
+                    st.error("Error en el reconocimiento")
+            except Exception as e:
+                st.error("Fallo de conexión OCR.")
+                
+    st.divider()
     
     st.subheader("1. Entrada de Vehículo")
     with st.form("form_iniciar"):
@@ -251,6 +268,21 @@ else:
                 except Exception as e:
                     st.error(f"Error al generar el reporte: {e}")
                     
+    st.write("<br>", unsafe_allow_html=True)
+    
+    st.subheader("⚙️ Administración del Sistema")
+    if st.button("⚠️ Ejecutar Cierre Diario Forzado"):
+        with st.spinner("Cerrando sesiones activas..."):
+            try:
+                res = requests.post(f"{API_URL}/cierre_diario_forzado")
+                if res.status_code == 200:
+                    st.success(res.json().get("mensaje", "Cierre ejecutado"))
+                    st.rerun()
+                else:
+                    st.error("Error al ejecutar cierre")
+            except Exception as e:
+                st.error("Error de conexión.")
+                
     st.write("<br>", unsafe_allow_html=True)
     
     col_grafico, col_tabla = st.columns(2, gap="large")

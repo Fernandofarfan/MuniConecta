@@ -16,10 +16,15 @@ def responder_telegram():
                 last_update_id = update["update_id"]
                 msg = update.get("message", {}).get("text", "")
                 chat_id = update["message"]["chat"]["id"]
-                if "Deuda" in msg:
+                if "deuda" in msg.lower():
                     patente = msg.split()[-1]
-                    res = requests.post(f"{API_URL}/calcular_cobro", json={"patente": patente, "metodo_pago": "digital"}).json()
-                    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": chat_id, "text": f"🚗 Patente: {patente}\n💰 Total: ${res.get('monto_final')}\n💳 Link: {res.get('link_pago_mp')}"})
+                    res = requests.post(f"{API_URL}/consultar_deuda", json={"patente": patente, "metodo_pago": "digital"}).json()
+                    if "detail" in res:
+                        # Error de API (no se encontró patente)
+                        texto_respuesta = f"❌ {res['detail']}"
+                    else:
+                        texto_respuesta = f"🚗 Patente: {patente}\n💰 Total: ${res.get('monto_final')}\n💳 Link: {res.get('link_pago_mp')}"
+                    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": chat_id, "text": texto_respuesta})
         except Exception as e: print(f"Error bot: {e}")
         time.sleep(2)
 

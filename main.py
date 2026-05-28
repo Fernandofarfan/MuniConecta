@@ -177,6 +177,60 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
         "link_pago_mp": link_pago_mp
     }
 
+@app.post("/consultar_deuda")
+async def consultar_deuda(peticion: PeticionCalcularCobro):
+    if peticion.metodo_pago not in ["digital", "efectivo"]:
+        raise HTTPException(status_code=400, detail="El método de pago debe ser 'digital' o 'efectivo'")
+        
+    url = f"{SUPABASE_URL}/rest/v1/estacionamientos"
+    patente_limpia = peticion.patente.upper().strip()
+    
+    async with httpx.AsyncClient() as cliente:
+        url_busqueda = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo&select=*"
+        respuesta_busqueda = await cliente.get(url_busqueda, headers=obtener_headers_supabase())
+        
+        if respuesta_busqueda.status_code != 200 or len(respuesta_busqueda.json()) == 0:
+            raise HTTPException(status_code=404, detail="No se encontró un estacionamiento activo para esta patente")
+            
+        registro = respuesta_busqueda.json()[0]
+        tipo_vehiculo = registro.get("tipo_vehiculo")
+        hora_inicio_str = registro.get("hora_inicio")
+        
+        try:
+            hora_inicio = datetime.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
+        except ValueError:
+            hora_inicio = datetime.now(TZ_ARG)
+        hora_fin = datetime.now(TZ_ARG)
+        
+        delta_tiempo = hora_fin - hora_inicio
+        minutos_transcurridos = delta_tiempo.total_seconds() / 60
+        
+        tarifa_base = 700 if tipo_vehiculo == "auto" else 300
+        costo_total = 0
+        
+        if minutos_transcurridos < 5:
+            costo_total = 0
+        elif minutos_transcurridos <= 60:
+            costo_total = tarifa_base
+        else:
+            minutos_adicionales = minutos_transcurridos - 60
+            fracciones_15_minutos = math.ceil(minutos_adicionales / 15)
+            costo_total = tarifa_base + (fracciones_15_minutos * (tarifa_base / 4))
+            
+        if peticion.metodo_pago == "digital" and costo_total > 0:
+            costo_total = costo_total * 0.8
+            
+    link_pago_mp = "https://mpago.la/mock_punatech_2026" if peticion.metodo_pago == "digital" else None
+
+    return {
+        "mensaje": "Consulta de deuda exitosa (no finaliza estacionamiento)",
+        "patente": patente_limpia,
+        "tiempo_transcurrido_minutos": round(minutos_transcurridos, 2),
+        "monto_final": costo_total,
+        "metodo_pago": peticion.metodo_pago,
+        "link_pago_mp": link_pago_mp
+    }
+
 @app.post("/escanear_patente")
 async def escanear_patente(peticion: PeticionOCR):
     return {"patente_detectada": "AB123CD", "confianza": 0.98, "mensaje": "Lectura procesada por motor OCR (Mock)"}
