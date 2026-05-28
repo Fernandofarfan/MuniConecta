@@ -15,6 +15,7 @@ load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+MUNICIPAL_CHANNEL_ID = os.getenv("MUNICIPAL_CHANNEL_ID", "")
 
 # Configurar Gemini
 if GEMINI_API_KEY:
@@ -36,6 +37,7 @@ Analizá el reclamo, extraé la calle o barrio, y verificá si está en el plan.
 Si ESTÁ, respondé de manera institucional indicando que la obra ya se encuentra programada o en ejecución para llevar tranquilidad al vecino. 
 Si NO ESTÁ, confirmá formalmente la recepción del reclamo y su derivación al área de Obras Públicas correspondiente. 
 IMPORTANTE: Si la imagen recibida NO muestra un problema urbano real (ej. selfies, personas, mascotas, saludos, pulgares arriba), respondé amablemente indicando que el canal es de uso exclusivo para reportes de infraestructura pública dañada.
+SI DETECTÁS lenguaje violento, amenazas, o situaciones de emergencia (ej. accidentes graves, delitos), no proceses el reclamo y respondé: 'Por motivos de seguridad, los reportes de emergencias deben realizarse a través de los canales oficiales al 911'.
 Respondé SIEMPRE en un tono formal, neutro, profesional y claro, adecuado para una entidad gubernamental. Mostrá empatía y vocación de servicio, pero evitá estrictamente el lunfardo, la jerga informal o el exceso de coloquialismos."""
 
 try:
@@ -144,6 +146,16 @@ async def telegram_webhook(request: Request):
                 
             # Enviar la respuesta generada al usuario por Telegram
             await send_telegram_message(chat_id, gemini_text)
+            
+            # Enviar una copia del reporte al canal privado de la municipalidad (Human-in-the-Loop)
+            if MUNICIPAL_CHANNEL_ID:
+                try:
+                    target_channel = int(MUNICIPAL_CHANNEL_ID)
+                except ValueError:
+                    target_channel = MUNICIPAL_CHANNEL_ID
+                
+                report_content = f"Nuevo Reporte: {user_text if user_text else '(Reporte con imagen sin texto)'}"
+                await send_telegram_message(target_channel, report_content)
             
     except Exception as e:
         logger.error(f"Error general en webhook: {e}")

@@ -3,3 +3,5 @@ uvicorn
 httpx
 google-generativeai
 python-dotenv
+streamlit
+pandas
