@@ -26,6 +26,11 @@ variable "gemini_api_key" {
   sensitive   = true
 }
 
+variable "docker_image" {
+  description = "Docker image URL in Artifact Registry"
+  type        = string
+}
+
 resource "google_cloud_run_v2_service" "municonecta_service" {
   name     = "municonecta-service"
   location = var.region
@@ -34,7 +39,7 @@ resource "google_cloud_run_v2_service" "municonecta_service" {
   template {
     containers {
       # Reemplazar con la imagen de tu contenedor Docker subido a Artifact Registry
-      image = "us-docker.pkg.dev/cloudrun/container/hello" 
+      image = var.docker_image 
       
       env {
         name  = "TELEGRAM_BOT_TOKEN"
@@ -55,4 +60,9 @@ resource "google_cloud_run_service_iam_member" "public_access" {
   service  = google_cloud_run_v2_service.municonecta_service.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+output "cloud_run_url" {
+  description = "La URL pública del servicio Cloud Run"
+  value       = google_cloud_run_v2_service.municonecta_service.uri
 }
