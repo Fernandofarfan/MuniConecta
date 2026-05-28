@@ -136,7 +136,27 @@ st.markdown("---")
 col_left, col_right = st.columns([3, 2])
 
 with col_left:
-    st.markdown('<div class="card"><h3>📥 Reclamos Ciudadanos Recibidos (Últimos Reportes)</h3></div>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><h3>ðŸ“¥ Reclamos Ciudadanos Recibidos (Últimos Reportes)</h3></div>', unsafe_allow_html=True)
+    
+    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+    
+    if st.button("🔄 Sincronizar Base de Datos"):
+        if SUPABASE_URL and SUPABASE_KEY:
+            try:
+                import httpx
+                headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+                res = httpx.get(f"{SUPABASE_URL}/rest/v1/reclamos?select=*", headers=headers)
+                if res.status_code == 200 and res.json():
+                    df_reclamos = pd.DataFrame(res.json())
+                    st.success("Sincronización exitosa con Supabase!")
+                else:
+                    st.warning("No hay datos en la nube, mostrando locales.")
+            except Exception as e:
+                st.error(f"Error conectando a Supabase: {e}")
+        else:
+            st.error("Credenciales de Supabase no configuradas.")
+
     st.dataframe(
         df_reclamos,
         use_container_width=True,

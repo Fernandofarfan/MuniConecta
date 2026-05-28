@@ -16,6 +16,8 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MUNICIPAL_CHANNEL_ID = os.getenv("MUNICIPAL_CHANNEL_ID", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 # Configurar Gemini
 if GEMINI_API_KEY:
@@ -150,6 +152,22 @@ async def telegram_webhook(request: Request):
             # Enviar una copia del reporte al canal privado de la municipalidad (Human-in-the-Loop)
             if MUNICIPAL_CHANNEL_ID:
                 await send_telegram_message(MUNICIPAL_CHANNEL_ID, f"Nuevo Reporte: {user_text}")
+                
+            # Guardar reporte en Supabase
+            if SUPABASE_URL and SUPABASE_KEY:
+                try:
+                    async with httpx.AsyncClient() as sb_client:
+                        headers = {
+                            "apikey": SUPABASE_KEY,
+                            "Authorization": f"Bearer {SUPABASE_KEY}",
+                            "Content-Type": "application/json"
+                        }
+                        payload = {"ubicacion": "Reporte de Telegram", "detalle": user_text}
+                        sb_url = f"{SUPABASE_URL}/rest/v1/reclamos"
+                        sb_res = await sb_client.post(sb_url, headers=headers, json=payload)
+                        logger.info(f"Supabase status: {sb_res.status_code}")
+                except Exception as sb_e:
+                    logger.error(f"Error escribiendo en Supabase: {sb_e}")
             
     except Exception as e:
         logger.error(f"Error general en webhook: {e}")
