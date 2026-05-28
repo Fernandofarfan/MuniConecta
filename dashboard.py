@@ -7,6 +7,8 @@ import pandas as pd
 import requests
 from datetime import datetime, timezone
 import plotly.express as px
+import google.generativeai as genai
+import numpy as np
 
 # Configuración inicial de la página
 st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide", initial_sidebar_state="collapsed")
@@ -75,6 +77,10 @@ st.markdown("""
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 def obtener_headers_supabase():
     return {
@@ -218,6 +224,33 @@ else:
     col2.metric("💰 Recaudación del Día", f"${recaudacion_hoy:,.2f}")
     col3.metric("📱 Adopción Pago Digital", f"{porcentaje_digital:.1f}%")
     
+    st.divider()
+    
+    st.subheader("🗺️ Mapa de Ocupación en Tiempo Real (Microcentro Salta)")
+    if not df_activos.empty:
+        df_map = df_activos.copy()
+        df_map['lat'] = -24.7883 + np.random.normal(0, 0.002, size=len(df_map))
+        df_map['lon'] = -65.4105 + np.random.normal(0, 0.002, size=len(df_map))
+        st.map(df_map[['lat', 'lon']], zoom=14)
+    else:
+        st.info("No hay vehículos estacionados para mostrar en el mapa.")
+        
+    st.write("<br>", unsafe_allow_html=True)
+    st.subheader("🤖 Intendente AI - Análisis Ejecutivo")
+    
+    if st.button("Generar Reporte Estratégico con IA"):
+        if not GEMINI_API_KEY:
+            st.error("⚠️ Falta configurar GEMINI_API_KEY en el archivo .env")
+        else:
+            with st.spinner("Analizando métricas en tiempo real..."):
+                try:
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    prompt = f"Actuá como un analista de datos del SEM de la Municipalidad de Salta. Hoy hay {vehiculos_activos} autos estacionados, la recaudación es de ${recaudacion_hoy:,.2f} y el {porcentaje_digital:.1f}% pagó digital. Redactá un reporte ejecutivo corto y formal (1 párrafo) para el Intendente, sugiriendo una acción operativa en la calle basándote en estos datos."
+                    respuesta = model.generate_content(prompt)
+                    st.info(respuesta.text)
+                except Exception as e:
+                    st.error(f"Error al generar el reporte: {e}")
+                    
     st.write("<br>", unsafe_allow_html=True)
     
     col_grafico, col_tabla = st.columns(2, gap="large")

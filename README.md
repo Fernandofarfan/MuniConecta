@@ -25,6 +25,7 @@ Crea un archivo `.env` en la raíz del proyecto con tus credenciales de Supabase
 ```env
 SUPABASE_URL=tu_url_de_supabase
 SUPABASE_KEY=tu_anon_key_de_supabase
+GEMINI_API_KEY=tu_api_key_de_gemini
 ```
 
 ### 2. Instalar Dependencias

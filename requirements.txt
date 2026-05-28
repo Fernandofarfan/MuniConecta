@@ -4,3 +4,5 @@ httpx
 streamlit
 pandas
 plotly
+google-generativeai
+numpy
