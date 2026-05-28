@@ -7,3 +7,5 @@ plotly
 google-generativeai
 numpy
 python-telegram-bot
+pytest
+httpx

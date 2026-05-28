@@ -244,16 +244,15 @@ async def consultar_deuda(peticion: PeticionCalcularCobro):
 async def escanear_patente(peticion: PeticionOCR):
     return {"patente_detectada": "AB123CD", "confianza": 0.98, "mensaje": "Lectura procesada por motor OCR (Mock)"}
 
-@app.post("/cierre_diario_forzado")
-async def cierre_diario_forzado():
+async def procesar_cierre_diario_background():
     url = f"{SUPABASE_URL}/rest/v1/estacionamientos"
-    
     async with httpx.AsyncClient() as cliente:
         url_busqueda = f"{url}?estado=eq.activo&select=*"
         respuesta_busqueda = await cliente.get(url_busqueda, headers=obtener_headers_supabase())
         
         if respuesta_busqueda.status_code != 200:
-            raise HTTPException(status_code=500, detail="Error al buscar activos")
+            logging.error(f"Error al buscar activos: {respuesta_busqueda.text}")
+            return
             
         activos = respuesta_busqueda.json()
         total_proyectado = 0
@@ -293,7 +292,13 @@ async def cierre_diario_forzado():
             headers_patch["Prefer"] = "return=minimal"
             await cliente.patch(url_actualizacion, headers=headers_patch, json=carga_actualizacion)
             
-    return {"mensaje": f"Cierre ejecutado. {len(activos)} vehículos actualizados con una deuda acumulada parcial de ${total_proyectado}. Los vehículos siguen activos y la deuda sigue creciendo."}
+        logging.info(f"Cierre diario en background completado. {len(activos)} registros procesados.")
+
+@app.post("/cierre_diario_forzado")
+async def cierre_diario_forzado(background_tasks: BackgroundTasks):
+    background_tasks.add_task(procesar_cierre_diario_background)
+    logging.info("Se ha disparado el cierre diario en segundo plano.")
+    return {"mensaje": "Cierre diario iniciado en segundo plano. Los registros se actualizarán asíncronamente para evitar caídas del servidor."}
 
 @app.get("/health")
 async def health_check():
