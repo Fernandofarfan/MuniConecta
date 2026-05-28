@@ -225,7 +225,10 @@ else:
     vehiculos_activos = len(df_activos)
     
     df_finalizados_hoy = df[(df['estado'] == 'finalizado') & (df['fecha_fin'] == hoy)]
-    recaudacion_hoy = df_finalizados_hoy['monto_final'].sum()
+    recaudacion_cerrada = df_finalizados_hoy['monto_final'].sum()
+    
+    deuda_activa = df_activos['monto_final'].sum()
+    recaudacion_hoy = recaudacion_cerrada + deuda_activa
     
     df_pagos_validos = df[(df['estado'] == 'finalizado') & (df['metodo_pago'].notna()) & (df['metodo_pago'] != "")]
     total_pagos = len(df_pagos_validos)
