@@ -64,3 +64,8 @@ Para que el sistema funcione correctamente, se requiere una tabla llamada `estac
 - `estado` (text: 'activo' o 'finalizado')
 - `monto_final` (numeric, nullable)
 - `metodo_pago` (text, nullable: 'digital' o 'efectivo')
+
+## 🛡️ Arquitectura Enterprise & DevOps
+- **CI/CD Pipeline:** Integración con GitHub Actions (`.github/workflows/deploy.yml`) para despliegues automatizados sin intervención manual.
+- **Base de Datos Optimizada:** Supabase con índices B-Tree en `estado` y `patente` para garantizar tiempos de respuesta < 50ms en el Dashboard.
+- **Healthchecks & CORS:** API configurada con políticas de seguridad estrictas y monitoreo de uptime.

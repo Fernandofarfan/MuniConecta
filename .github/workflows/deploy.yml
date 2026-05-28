@@ -1,0 +1,15 @@
+name: Deploy to Cloud Run
+on:
+  push:
+    branches: [ main ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Google Auth (Mock)
+      run: echo "Aquí iría la autenticación con Workload Identity Federation de GCP"
+    - name: Build and Deploy to Cloud Run
+      run: echo "gcloud run deploy municonecta-service --image us-central1-docker.pkg.dev/... --region us-central1"
+# Nota: Pipeline configurado en modo Dry-Run para demostración de arquitectura en el Hackathon.

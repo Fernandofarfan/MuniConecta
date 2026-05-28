@@ -2,10 +2,19 @@ import os
 import math
 from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 
 app = FastAPI(title="SEM Express")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -285,3 +294,7 @@ async def cierre_diario_forzado():
             await cliente.patch(url_actualizacion, headers=headers_patch, json=carga_actualizacion)
             
     return {"mensaje": f"Cierre ejecutado. {len(activos)} vehículos actualizados con una deuda acumulada parcial de ${total_proyectado}. Los vehículos siguen activos y la deuda sigue creciendo."}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
