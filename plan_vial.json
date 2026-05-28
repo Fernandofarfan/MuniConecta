@@ -23,5 +23,15 @@
     "ubicacion": "Avenida Bolivia",
     "descripcion": "Repavimentación integral",
     "estado": "programado"
+  },
+  {
+    "ubicacion": "Avenida San Martín",
+    "descripcion": "Reparación de red semafórica y luminarias LED",
+    "estado": "planificado"
+  },
+  {
+    "ubicacion": "Parque San Martín",
+    "descripcion": "Puesta en valor integral del lago y caminerías",
+    "estado": "en ejecucion"
   }
 ]

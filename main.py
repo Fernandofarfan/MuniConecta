@@ -36,6 +36,7 @@ Acá tenés el Plan de Obras actual: {json.dumps(PLAN_VIAL_DATA, ensure_ascii=Fa
 Analizá el reclamo, extraé la calle o barrio, y verificá si está en el plan. 
 Si ESTÁ, respondé con alegría que la obra ya está programada. 
 Si NO ESTÁ, respondé que registraste el reclamo y derivaste a Obras Públicas. 
+IMPORTANTE: Si la imagen recibida NO muestra un problema urbano real (ej. selfies, mascotas, saludos, pulgares arriba), respondé amablemente que solo podés procesar reportes de infraestructura pública.
 Respondé SIEMPRE en español rioplatense, corto y empático."""
 
 try:
@@ -60,6 +61,19 @@ async def send_telegram_message(chat_id: int, text: str):
         except Exception as e:
             logger.error(f"Error enviando respuesta a Telegram: {e}")
 
+async def send_chat_action(chat_id: int):
+    """Envía la acción de 'typing' a Telegram para indicar que el bot está respondiendo."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendChatAction"
+    payload = {
+        "chat_id": chat_id,
+        "action": "typing"
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(url, json=payload)
+        except Exception as e:
+            logger.error(f"Error enviando chat action a Telegram: {e}")
+
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     """Endpoint para recibir updates (mensajes y fotos) de Telegram."""
@@ -70,6 +84,9 @@ async def telegram_webhook(request: Request):
         if "message" in update:
             message = update["message"]
             chat_id = message["chat"]["id"]
+            
+            # Enviar acción de "escribiendo..." al usuario
+            await send_chat_action(chat_id)
             
             # Obtener texto del mensaje o caption de la foto
             user_text = message.get("text", "")
