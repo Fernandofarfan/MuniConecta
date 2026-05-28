@@ -237,6 +237,51 @@ async def escanear_patente(peticion: PeticionOCR):
 
 @app.post("/cierre_diario_forzado")
 async def cierre_diario_forzado():
-    # Lógica: Buscar activos -> Iterar -> Calcular cobro -> Patch a 'finalizado'
-    # Retornar resumen del cierre
-    return {"mensaje": "Cierre diario ejecutado exitosamente."}
+    url = f"{SUPABASE_URL}/rest/v1/estacionamientos"
+    
+    async with httpx.AsyncClient() as cliente:
+        url_busqueda = f"{url}?estado=eq.activo&select=*"
+        respuesta_busqueda = await cliente.get(url_busqueda, headers=obtener_headers_supabase())
+        
+        if respuesta_busqueda.status_code != 200:
+            raise HTTPException(status_code=500, detail="Error al buscar activos")
+            
+        activos = respuesta_busqueda.json()
+        total_proyectado = 0
+        
+        for registro in activos:
+            tipo_vehiculo = registro.get("tipo_vehiculo")
+            hora_inicio_str = registro.get("hora_inicio")
+            
+            try:
+                hora_inicio = datetime.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
+            except ValueError:
+                hora_inicio = datetime.now(TZ_ARG)
+            hora_fin = datetime.now(TZ_ARG)
+            
+            delta_tiempo = hora_fin - hora_inicio
+            minutos_transcurridos = delta_tiempo.total_seconds() / 60
+            
+            tarifa_base = 700 if tipo_vehiculo == "auto" else 300
+            costo_total = 0
+            
+            if minutos_transcurridos < 5:
+                costo_total = 0
+            elif minutos_transcurridos <= 60:
+                costo_total = tarifa_base
+            else:
+                minutos_adicionales = minutos_transcurridos - 60
+                fracciones_15_minutos = math.ceil(minutos_adicionales / 15)
+                costo_total = tarifa_base + (fracciones_15_minutos * (tarifa_base / 4))
+                
+            total_proyectado += costo_total
+            
+            carga_actualizacion = {
+                "monto_final": costo_total
+            }
+            url_actualizacion = f"{url}?id=eq.{registro['id']}"
+            headers_patch = obtener_headers_supabase()
+            headers_patch["Prefer"] = "return=minimal"
+            await cliente.patch(url_actualizacion, headers=headers_patch, json=carga_actualizacion)
+            
+    return {"mensaje": f"Cierre ejecutado. {len(activos)} vehículos actualizados con una deuda acumulada parcial de ${total_proyectado}. Los vehículos siguen activos y la deuda sigue creciendo."}
