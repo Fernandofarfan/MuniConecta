@@ -92,3 +92,5 @@ Copia la URL que devolvió Terraform (el `cloud_run_url`) y ejecuta el siguiente
 curl -F "url=<URL_DE_CLOUD_RUN>/webhook" https://api.telegram.org/bot<TU_TELEGRAM_BOT_TOKEN>/setWebhook
 ```
 *(Nota: Asegúrate de reemplazar `<URL_DE_CLOUD_RUN>` y `<TU_TELEGRAM_BOT_TOKEN>` con tus valores reales. Además, el endpoint exacto debe coincidir con la ruta definida en tu FastAPI, por ejemplo `/webhook` si esa es tu ruta POST).*
+
+
