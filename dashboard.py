@@ -9,6 +9,10 @@ from datetime import datetime, timezone
 import plotly.express as px
 import google.generativeai as genai
 import numpy as np
+from streamlit_autorefresh import st_autorefresh
+
+# Actualiza el dashboard cada 10 segundos automáticamente simulando Real-Time
+st_autorefresh(interval=10000, key="data_refresh")
 
 # Configuración inicial de la página
 st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide", initial_sidebar_state="collapsed")

@@ -9,3 +9,5 @@ numpy
 python-telegram-bot
 pytest
 httpx
+websockets
+streamlit-autorefresh

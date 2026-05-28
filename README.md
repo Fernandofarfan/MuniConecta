@@ -71,3 +71,5 @@ El despliegue de SEM Express está diseñado bajo estándares empresariales:
 - **Alta Disponibilidad:** El servicio Cloud Run está configurado con Auto-Scaling (min 1, max 10) para evitar "Cold Starts" y soportar picos de concurrencia durante los cambios de turno (hasta 80 request simultáneos por instancia).
 - **Procesamiento Asíncrono:** Uso de `BackgroundTasks` de FastAPI para el cierre masivo de jornadas, previniendo cuellos de botella y *timeouts* en el servidor.
 - **TDD & QA Automático:** Suite de pruebas unitarias con `pytest` integradas en el pipeline de GitHub Actions (`deploy.yml`) para garantizar cero regresiones en cada despliegue.
+- **Patrones de Diseño:** Uso de Dependency Injection en FastAPI para manejar las credenciales, facilitando el testing y la modularidad.
+- **Arquitectura Event-Driven (Preparada):** Implementación de WebSockets (`/ws/dashboard`) para permitir notificaciones Push en tiempo real a clientes conectados, reduciendo el polling a la base de datos.

@@ -3,8 +3,10 @@ import math
 from datetime import datetime, timezone, timedelta
 import logging
 import asyncio
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List
+import json
 from pydantic import BaseModel
 import httpx
 
@@ -26,13 +28,44 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 # 1. ZONA HORARIA ARGENTINA (UTC-3)
 TZ_ARG = timezone(timedelta(hours=-3))
 
-def obtener_headers_supabase():
-    """Retorna los headers necesarios para la API de Supabase"""
+async def get_supabase_headers():
+    if not SUPABASE_KEY:
+        raise HTTPException(status_code=500, detail="Supabase Key no configurada en el servidor.")
     return {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json"
     }
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/dashboard")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Mantenemos la conexión viva
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 # 2. FUNCIÓN DE VALIDACIÓN DE HORARIOS (ORDENANZA 12.170)
 def es_horario_cobrable(fecha_hora: datetime) -> bool:
@@ -70,10 +103,9 @@ class PeticionOCR(BaseModel):
     imagen_base64: str
 
 @app.post("/iniciar_estacionamiento")
-async def iniciar_estacionamiento(peticion: PeticionIniciarEstacionamiento):
+async def iniciar_estacionamiento(peticion: PeticionIniciarEstacionamiento, headers: dict = Depends(get_supabase_headers)):
+    # 3. VERIFICACIÓN DE HORARIO COBRABLE
     ahora = datetime.now(TZ_ARG)
-    
-    # 3. INYECTAR VALIDACIÓN
     if not es_horario_cobrable(ahora):
         raise HTTPException(
             status_code=400, 
@@ -98,20 +130,21 @@ async def iniciar_estacionamiento(peticion: PeticionIniciarEstacionamiento):
     async with httpx.AsyncClient() as cliente:
         # Verificar si la patente ya tiene un estacionamiento activo
         url_verificacion = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo"
-        respuesta_verificacion = await cliente.get(url_verificacion, headers=obtener_headers_supabase())
+        respuesta_verificacion = await cliente.get(url_verificacion, headers=headers)
         
         if respuesta_verificacion.status_code == 200 and len(respuesta_verificacion.json()) > 0:
             raise HTTPException(status_code=400, detail="El vehículo ya tiene un estacionamiento activo en curso")
             
         # Iniciar estacionamiento
-        respuesta = await cliente.post(url, headers=obtener_headers_supabase(), json=carga_datos)
+        respuesta = await cliente.post(url, headers=headers, json=carga_datos)
         if respuesta.status_code not in [201, 204]:
             raise HTTPException(status_code=500, detail="Error al guardar el registro en Supabase")
             
+    await manager.broadcast(json.dumps({"event": "update_dashboard"}))
     return {"mensaje": "Estacionamiento iniciado correctamente", "datos": carga_datos}
 
 @app.post("/calcular_cobro")
-async def calcular_cobro(peticion: PeticionCalcularCobro):
+async def calcular_cobro(peticion: PeticionCalcularCobro, headers: dict = Depends(get_supabase_headers)):
     if peticion.metodo_pago not in ["digital", "efectivo"]:
         raise HTTPException(status_code=400, detail="El método de pago debe ser 'digital' o 'efectivo'")
         
@@ -121,7 +154,7 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
     async with httpx.AsyncClient() as cliente:
         # Buscar el estacionamiento activo para esta patente
         url_busqueda = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo&select=*"
-        respuesta_busqueda = await cliente.get(url_busqueda, headers=obtener_headers_supabase())
+        respuesta_busqueda = await cliente.get(url_busqueda, headers=headers)
         
         if respuesta_busqueda.status_code != 200 or len(respuesta_busqueda.json()) == 0:
             raise HTTPException(status_code=404, detail="No se encontró un estacionamiento activo para esta patente")
@@ -170,7 +203,7 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
         }
         
         url_actualizacion = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo"
-        headers_patch = obtener_headers_supabase()
+        headers_patch = headers.copy()
         headers_patch["Prefer"] = "return=representation"
         
         respuesta_actualizacion = await cliente.patch(url_actualizacion, headers=headers_patch, json=carga_actualizacion)
@@ -181,6 +214,7 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
     # 4. INTEGRACIÓN MERCADO PAGO (MOCK)
     link_pago_mp = "https://mpago.la/mock_punatech_2026" if peticion.metodo_pago == "digital" else None
 
+    await manager.broadcast(json.dumps({"event": "update_dashboard"}))
     return {
         "mensaje": "Estacionamiento finalizado y cobro calculado",
         "patente": patente_limpia,
@@ -191,7 +225,7 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
     }
 
 @app.post("/consultar_deuda")
-async def consultar_deuda(peticion: PeticionCalcularCobro):
+async def consultar_deuda(peticion: PeticionCalcularCobro, headers: dict = Depends(get_supabase_headers)):
     if peticion.metodo_pago not in ["digital", "efectivo"]:
         raise HTTPException(status_code=400, detail="El método de pago debe ser 'digital' o 'efectivo'")
         
@@ -200,7 +234,7 @@ async def consultar_deuda(peticion: PeticionCalcularCobro):
     
     async with httpx.AsyncClient() as cliente:
         url_busqueda = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo&select=*"
-        respuesta_busqueda = await cliente.get(url_busqueda, headers=obtener_headers_supabase())
+        respuesta_busqueda = await cliente.get(url_busqueda, headers=headers)
         
         if respuesta_busqueda.status_code != 200 or len(respuesta_busqueda.json()) == 0:
             raise HTTPException(status_code=404, detail="No se encontró un estacionamiento activo para esta patente")
@@ -235,6 +269,7 @@ async def consultar_deuda(peticion: PeticionCalcularCobro):
             
     link_pago_mp = "https://mpago.la/mock_punatech_2026" if peticion.metodo_pago == "digital" else None
 
+    await manager.broadcast(json.dumps({"event": "update_dashboard"}))
     return {
         "mensaje": "Consulta de deuda exitosa (no finaliza estacionamiento)",
         "patente": patente_limpia,
@@ -250,9 +285,10 @@ async def escanear_patente(peticion: PeticionOCR):
 
 async def procesar_cierre_diario_background():
     url = f"{SUPABASE_URL}/rest/v1/estacionamientos"
+    headers = await get_supabase_headers()
     async with httpx.AsyncClient() as cliente:
         url_busqueda = f"{url}?estado=eq.activo&select=*"
-        respuesta_busqueda = await cliente.get(url_busqueda, headers=obtener_headers_supabase())
+        respuesta_busqueda = await cliente.get(url_busqueda, headers=headers)
         
         if respuesta_busqueda.status_code != 200:
             logging.error(f"Error al buscar activos: {respuesta_busqueda.text}")
@@ -292,11 +328,12 @@ async def procesar_cierre_diario_background():
                 "monto_final": costo_total
             }
             url_actualizacion = f"{url}?id=eq.{registro['id']}"
-            headers_patch = obtener_headers_supabase()
+            headers_patch = headers.copy()
             headers_patch["Prefer"] = "return=minimal"
             await cliente.patch(url_actualizacion, headers=headers_patch, json=carga_actualizacion)
             
         logging.info(f"Cierre diario en background completado. {len(activos)} registros procesados.")
+        await manager.broadcast(json.dumps({"event": "update_dashboard"}))
 
 @app.post("/cierre_diario_forzado")
 async def cierre_diario_forzado(background_tasks: BackgroundTasks):
