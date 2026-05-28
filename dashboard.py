@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Configuración premium de página
 st.set_page_config(
     page_title="MuniConecta - Panel de Gestión Municipal",
@@ -165,11 +167,19 @@ with col_left:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Gráfico simple de Categorías de Reclamos
+    # GrÃ¡fico simple de CategorÃas de Reclamos (Validando existencia de columna)
     st.subheader("📊 Distribución de Reclamos por Categoría")
-    category_counts = df_reclamos["Categoría"].value_counts().reset_index()
-    category_counts.columns = ["Categoría", "Cantidad"]
-    st.bar_chart(data=category_counts, x="Categoría", y="Cantidad", use_container_width=True)
+    if "Categoría" in df_reclamos.columns:
+        category_counts = df_reclamos["Categoría"].value_counts().reset_index()
+        category_counts.columns = ["Categoría", "Cantidad"]
+        st.bar_chart(data=category_counts, x="Categoría", y="Cantidad", use_container_width=True)
+    elif "ubicacion" in df_reclamos.columns:
+        # Si vienen de Supabase (las columnas se llaman distinto), usamos ubicacion temporalmente para el grÃ¡fico
+        category_counts = df_reclamos["ubicacion"].value_counts().reset_index()
+        category_counts.columns = ["Ubicación", "Cantidad"]
+        st.bar_chart(data=category_counts, x="Ubicación", y="Cantidad", use_container_width=True)
+    else:
+        st.info("No hay suficientes datos categorizados para mostrar el grÃ¡fico.")
 
 with col_right:
     st.markdown('<div class="card"><h3>🗺️ Estado del Plan Vial de Obras (RAG Dataset)</h3></div>', unsafe_allow_html=True)
