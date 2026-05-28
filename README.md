@@ -1,96 +1,61 @@
-# MuniConecta - Guía de Despliegue y Pruebas
+# SEM Express - Sistema de Estacionamiento Medido
 
-Este documento detalla los pasos exactos para probar la aplicación localmente en tiempo real y para preparar, construir y desplegar MuniConecta en Google Cloud Platform (GCP) utilizando Docker, Artifact Registry y Terraform.
+SEM Express es un sistema integral para la gestión y cobro de estacionamiento medido municipal. Consta de una API robusta y un panel de control en tiempo real para visualizar las métricas clave.
 
-## 🚀 Demo en Vivo y Presentación
-- **Sitio Web Oficial:** [https://v0-municonecta-landing-page.vercel.app](https://v0-municonecta-landing-page.vercel.app)
-- **Probar el Bot en Telegram:** [@MuniConecta_Bot](https://t.me/MuniConecta_Bot)
+## 🛠️ Tecnologías Utilizadas
+- **Backend:** FastAPI, Python, Supabase (REST API vía httpx)
+- **Frontend / Panel de Control:** Streamlit, Pandas, Plotly
+- **Base de Datos:** Supabase (PostgreSQL)
 
----
+## 🚀 Características Principales
+- **Inicio de Estacionamiento:** Registro en tiempo real de vehículos (autos y motos).
+- **Cálculo de Cobro Estricto:**
+  - Tolerancia de 5 minutos sin cargo.
+  - Primera hora completa, luego fraccionado cada 15 minutos exactos.
+  - Descuento del 20% aplicable para pagos digitales (Mercado Pago).
+- **Panel de Control en Vivo:**
+  - Métricas de vehículos estacionados, recaudación del día y adopción de pagos digitales.
+  - Gráficos interactivos de métodos de pago.
+  - Tabla de registros activos en tiempo real.
 
-## Desarrollo y Pruebas Locales (Modo Polling)
+## 💻 Instalación y Uso Local
 
-Si quieres probar el bot localmente en tiempo real sin desplegarlo en Google Cloud Platform, puedes hacerlo utilizando el script de Polling local. Esto leerá las actualizaciones directamente desde la API de Telegram sin necesidad de configurar Webhooks ni HTTPS locales.
-
-### 1. Configurar el archivo `.env`
-Asegúrate de tener un archivo `.env` en la raíz del proyecto con las siguientes variables:
+### 1. Configurar Variables de Entorno
+Crea un archivo `.env` en la raíz del proyecto con tus credenciales de Supabase:
 ```env
-TELEGRAM_BOT_TOKEN=tu_token_de_telegram
-GEMINI_API_KEY=tu_api_key_de_gemini
+SUPABASE_URL=tu_url_de_supabase
+SUPABASE_KEY=tu_anon_key_de_supabase
 ```
 
-### 2. Ejecutar el bot localmente
-Ejecuta el script `local_poll.py` utilizando tu entorno virtual:
-
-**En Windows:**
-```powershell
-.\venv\Scripts\python.exe local_poll.py
-```
-
-**En Linux/macOS:**
+### 2. Instalar Dependencias
+Asegúrate de tener un entorno virtual activo e instala las dependencias necesarias.
+Ejemplo de dependencias clave requeridas:
 ```bash
-source venv/bin/activate
-python local_poll.py
+pip install fastapi uvicorn httpx pydantic streamlit pandas plotly requests
 ```
 
-*Nota: Este script borrará temporalmente cualquier Webhook configurado en Telegram para que las actualizaciones se reciban directamente en tu máquina.*
+### 3. Ejecutar los Servicios
 
----
-
-## Despliegue en GCP (Producción)
-
-## Requisitos Previos
-
-- Tener instalados: `gcloud` CLI, `docker`, y `terraform`.
-- Tener un proyecto en GCP creado (reemplazar `<TU_PROJECT_ID>` por el ID real en los comandos).
-
-## 1. Autenticación y Configuración de GCP
-
-Primero, inicia sesión y configura tu proyecto por defecto:
-
+**Iniciar la API (FastAPI):**
 ```bash
-gcloud auth login
-gcloud config set project <TU_PROJECT_ID>
-gcloud auth configure-docker us-central1-docker.pkg.dev
+fastapi dev main.py
+# o alternativamente:
+uvicorn main:app --reload
 ```
 
-*(Asegúrate de tener habilitada la API de Artifact Registry y Cloud Run en tu proyecto).*
-
-## 2. Construir y Subir la Imagen Docker
-
-Construye la imagen de FastAPI localmente y haz push al repositorio de Artifact Registry:
-
+**Iniciar el Panel de Control (Streamlit):**
 ```bash
-# Construir la imagen
-docker build -t us-central1-docker.pkg.dev/283983142913/municonecta-repo/municonecta-api:latest .
-
-# Subir la imagen a Artifact Registry
-docker push us-central1-docker.pkg.dev/283983142913/municonecta-repo/municonecta-api:latest
+streamlit run dashboard.py
 ```
 
-## 3. Desplegar Infraestructura con Terraform
-
-Inicializa Terraform y aplica los cambios. Se te pedirán las variables sensibles o puedes pasarlas directamente en el comando:
-
-```bash
-terraform init
-
-terraform apply \
-  -var="project_id=<TU_PROJECT_ID>" \
-  -var="telegram_bot_token=<TU_TELEGRAM_BOT_TOKEN>" \
-  -var="gemini_api_key=<TU_GEMINI_API_KEY>" \
-  -var="docker_image=us-central1-docker.pkg.dev/283983142913/municonecta-repo/municonecta-api:latest"
-```
-
-Confirma la acción escribiendo `yes` cuando Terraform te lo solicite. Al finalizar, Terraform mostrará el output `cloud_run_url`.
-
-## 4. Configurar el Webhook de Telegram
-
-Copia la URL que devolvió Terraform (el `cloud_run_url`) y ejecuta el siguiente comando para conectar el bot de Telegram con el endpoint de tu API en Cloud Run:
-
-```bash
-curl -F "url=<URL_DE_CLOUD_RUN>/webhook" https://api.telegram.org/bot<TU_TELEGRAM_BOT_TOKEN>/setWebhook
-```
-*(Nota: Asegúrate de reemplazar `<URL_DE_CLOUD_RUN>` y `<TU_TELEGRAM_BOT_TOKEN>` con tus valores reales. Además, el endpoint exacto debe coincidir con la ruta definida en tu FastAPI, por ejemplo `/webhook` si esa es tu ruta POST).*
-
-
+## 🏗️ Estructura de la Base de Datos (Supabase)
+Para que el sistema funcione correctamente, se requiere una tabla llamada `estacionamientos` con la siguiente estructura:
+- `id` (uuid o int8, primary key, auto-generado)
+- `patente` (text)
+- `tipo_vehiculo` (text: 'auto' o 'moto')
+- `legajo_permisionario` (text)
+- `hora_inicio` (timestamptz)
+- `hora_fin` (timestamptz, nullable)
+- `estado` (text: 'activo' o 'finalizado')
+- `monto_final` (numeric, nullable)
+- `metodo_pago` (text, nullable: 'digital' o 'efectivo')

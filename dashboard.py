@@ -1,216 +1,134 @@
+import os
 import streamlit as st
 import pandas as pd
-import json
-import os
-from dotenv import load_dotenv
-from streamlit_autorefresh import st_autorefresh
+import requests
+from datetime import datetime, timezone
+import plotly.express as px
 
-load_dotenv()
-# Configuración premium de página
-st.set_page_config(
-    page_title="MuniConecta - Panel de Gestión Municipal",
-    page_icon="🏛️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Configuración inicial de la página
+st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide")
 
-# Estilos personalizados premium (CSS inyectado)
-st.markdown("""
-    <style>
-    .main-title {
-        font-family: 'Outfit', 'Inter', sans-serif;
-        color: #1E3A8A;
-        font-weight: 700;
-        margin-bottom: 5px;
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+def obtener_headers_supabase():
+    """Retorna los headers para conectarse a Supabase de forma segura"""
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
     }
-    .subtitle {
-        color: #6B7280;
-        font-size: 1.1rem;
-        margin-bottom: 30px;
-    }
-    .card {
-        background-color: #F8FAFC;
-        padding: 20px;
-        border-radius: 12px;
-        border-left: 5px solid #2563EB;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-        margin-bottom: 20px;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-# Encabezado
-st.title("MuniConecta - Panel de Gestión Municipal")
-st.markdown('<p class="subtitle">GobTech de vanguardia para la atención del ciudadano y planificación de la Municipalidad de Salta</p>', unsafe_allow_html=True)
-
-# Cargar Plan de Obras desde plan_vial.json
-try:
-    with open("plan_vial.json", "r", encoding="utf-8") as f:
-        plan_vial_data = json.load(f)
-    df_plan = pd.DataFrame(plan_vial_data)
-except Exception as e:
-    df_plan = pd.DataFrame(columns=["ubicacion", "descripcion", "estado"])
-    st.error(f"Error cargando el Plan de Obras: {e}")
-
-# Reclamos Recibidos Mockeados (Simulados para la Demo)
-reclamos_mock = [
-    {
-        "ID": "RC-0421",
-        "Fecha": "2026-05-28",
-        "Ubicación": "Plaza 9 de Julio",
-        "Categoría": "Luminarias",
-        "Detalle": "Farola rota en la esquina de España",
-        "Estado": "En proceso (IA)",
-        "Gravedad": "Media"
-    },
-    {
-        "ID": "RC-0420",
-        "Fecha": "2026-05-28",
-        "Ubicación": "Avenida del Carnaval",
-        "Categoría": "Bacheo",
-        "Detalle": "Bache profundo a mitad de avenida",
-        "Estado": "Programado (RAG)",
-        "Gravedad": "Alta"
-    },
-    {
-        "ID": "RC-0419",
-        "Fecha": "2026-05-27",
-        "Ubicación": "Calle Alvarado 400",
-        "Categoría": "Semáforos",
-        "Detalle": "Luz amarilla fuera de servicio",
-        "Estado": "Derivado a Obras Públicas",
-        "Gravedad": "Alta"
-    },
-    {
-        "ID": "RC-0418",
-        "Fecha": "2026-05-27",
-        "Ubicación": "Barrio Tres Cerritos",
-        "Categoría": "Espacios Verdes",
-        "Detalle": "Poda preventiva de árbol sobre cables",
-        "Estado": "En ejecución",
-        "Gravedad": "Baja"
-    },
-    {
-        "ID": "RC-0417",
-        "Fecha": "2026-05-26",
-        "Ubicación": "Canal Juan XXIII",
-        "Categoría": "Puentes/Estructuras",
-        "Detalle": "Grieta leve en baranda de contención",
-        "Estado": "Planificado (RAG)",
-        "Gravedad": "Media"
-    }
-]
-df_reclamos = pd.DataFrame(reclamos_mock)
-
-# Métricas Destacadas
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric(
-        label="Reclamos Procesados hoy",
-        value="42",
-        delta="+15% vs ayer"
-    )
-
-with col2:
-    st.metric(
-        label="🛠️ Obras en Ejecución",
-        value=str(len(df_plan[df_plan["estado"] == "en ejecucion"]) if not df_plan.empty else 0),
-        delta="En curso"
-    )
-
-with col3:
-    st.metric(
-        label="📅 Obras Programadas",
-        value=str(len(df_plan[df_plan["estado"] == "programado"]) if not df_plan.empty else 0),
-        delta="Para inicio"
-    )
-
-with col4:
-    st.metric(
-        label="🎯 Precisión RAG / IA",
-        value="98.4%",
-        delta="Estable"
-    )
-
-st.markdown("---")
-
-# Layout de dos columnas
-col_left, col_right = st.columns([3, 2])
-
-with col_left:
-    st.markdown('<div class="card"><h3>📥 Reclamos Ciudadanos Recibidos (Últimos Reportes)</h3></div>', unsafe_allow_html=True)
-    
-    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-    SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-    
-    st_autorefresh(interval=10000, limit=None, key="data_refresh")
-    
-    if SUPABASE_URL and SUPABASE_KEY:
-        try:
-            import httpx
-            headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-            res = httpx.get(f"{SUPABASE_URL}/rest/v1/reclamos?select=*", headers=headers)
-            if res.status_code == 200 and res.json():
-                df_reclamos = pd.DataFrame(res.json())
-        except Exception as e:
-            st.error(f"Error conectando a Supabase: {e}")
-
-    st.dataframe(
-        df_reclamos,
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # GrÃ¡fico simple de CategorÃas de Reclamos (Validando existencia de columna)
-    st.subheader("📊 Distribución de Reclamos por Categoría")
-    if "Categoría" in df_reclamos.columns:
-        category_counts = df_reclamos["Categoría"].value_counts().reset_index()
-        category_counts.columns = ["Categoría", "Cantidad"]
-        st.bar_chart(data=category_counts, x="Categoría", y="Cantidad", use_container_width=True)
-    elif "ubicacion" in df_reclamos.columns:
-        # Si vienen de Supabase (las columnas se llaman distinto), usamos ubicacion temporalmente para el grÃ¡fico
-        category_counts = df_reclamos["ubicacion"].value_counts().reset_index()
-        category_counts.columns = ["Ubicación", "Cantidad"]
-        st.bar_chart(data=category_counts, x="Ubicación", y="Cantidad", use_container_width=True)
-    else:
-        st.info("No hay suficientes datos categorizados para mostrar el grÃ¡fico.")
-
-with col_right:
-    st.markdown('<div class="card"><h3>🗺️ Estado del Plan Vial de Obras (RAG Dataset)</h3></div>', unsafe_allow_html=True)
-    if not df_plan.empty:
-        # Formatear columnas para visualización premium
-        df_plan_show = df_plan.copy()
-        df_plan_show.columns = ["📍 Ubicación", "📝 Descripción de Obra", "🔧 Estado Actual"]
-        st.dataframe(
-            df_plan_show,
-            use_container_width=True,
-            hide_index=True
-        )
-    else:
-        st.info("No se encontraron registros de obras planificadas.")
+def cargar_datos_estacionamientos():
+    """Obtiene todos los registros de estacionamiento desde Supabase"""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        st.error("Credenciales de Supabase no configuradas. Revisa las variables de entorno.")
+        return []
         
-    st.markdown("<br>", unsafe_allow_html=True)
+    url = f"{SUPABASE_URL}/rest/v1/estacionamientos?select=*"
+    respuesta = requests.get(url, headers=obtener_headers_supabase())
+    if respuesta.status_code == 200:
+        return respuesta.json()
+    else:
+        st.error(f"Error al conectar con Supabase: {respuesta.status_code}")
+        return []
+
+st.title("🚗 SEM Express - Panel de Control")
+st.markdown("Sistema de Estacionamiento Medido Municipal")
+
+datos = cargar_datos_estacionamientos()
+
+if not datos:
+    st.info("No hay datos de estacionamientos registrados en el sistema.")
+else:
+    df = pd.DataFrame(datos)
     
-    # Tarjeta Informativa en la barra lateral o columna
-    st.info("""
-    **💡 Nota para el Jurado:**
-    MuniConecta utiliza embeddings para buscar sobre este Plan Vial de Obras (`plan_vial.json`) en tiempo real cuando el ciudadano envía su mensaje.
-    Si el reporte del ciudadano coincide semánticamente con alguna de estas locaciones, el bot Gemini responde indicando que ya está contemplada en el presupuesto municipal, garantizando transparencia.
-    """)
-
-# Sidebar institucional
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/e/ec/Escudo_de_la_Ciudad_de_Salta.svg", width=100)
-st.sidebar.title("MuniConecta - Salta")
-st.sidebar.markdown("""
-**Estado del Sistema:**
-- 🟢 Webhook: Activo
-- 🟢 FastAPI: Cloud Run
-- 🟢 Base de datos: RAG Activo
-- 🟢 IA Model: Gemini-2.5-Flash
-""")
-
-st.sidebar.markdown("---")
-st.sidebar.caption("Hackathon GovTech 2026 - Municipalidad de la Ciudad de Salta")
+    # Validar que existan las columnas necesarias, para evitar errores si la base está vacía o es nueva
+    columnas_esperadas = ["estado", "monto_final", "metodo_pago", "hora_inicio", "hora_fin", "patente", "legajo_permisionario"]
+    for col in columnas_esperadas:
+        if col not in df.columns:
+            df[col] = None
+            
+    # Convertir montos a numérico para poder operar
+    df['monto_final'] = pd.to_numeric(df['monto_final'], errors='coerce').fillna(0)
+    
+    # Procesar fechas
+    df['hora_inicio_dt'] = pd.to_datetime(df['hora_inicio'], errors='coerce')
+    df['fecha_inicio'] = df['hora_inicio_dt'].dt.date
+    df['hora_fin_dt'] = pd.to_datetime(df['hora_fin'], errors='coerce')
+    df['fecha_fin'] = df['hora_fin_dt'].dt.date
+    # Si no tiene fecha de fin, usamos la de inicio para tener una referencia
+    df['fecha_fin'] = df['fecha_fin'].fillna(df['fecha_inicio'])
+    
+    # --- MÉTRICAS CLAVE ---
+    hoy = datetime.now(timezone.utc).date()
+    
+    # 1. Vehículos Estacionados Ahora
+    df_activos = df[df['estado'] == 'activo']
+    vehiculos_activos = len(df_activos)
+    
+    # 2. Recaudación del Día (suma de montos finalizados de hoy)
+    df_finalizados_hoy = df[(df['estado'] == 'finalizado') & (df['fecha_fin'] == hoy)]
+    recaudacion_hoy = df_finalizados_hoy['monto_final'].sum()
+    
+    # 3. Adopción de Pago Digital
+    # Analizamos todos los pagos finalizados para sacar la estadística
+    df_pagos_validos = df[(df['estado'] == 'finalizado') & (df['metodo_pago'].notna()) & (df['metodo_pago'] != "")]
+    total_pagos = len(df_pagos_validos)
+    pagos_digitales = len(df_pagos_validos[df_pagos_validos['metodo_pago'] == 'digital'])
+    
+    porcentaje_digital = 0.0
+    if total_pagos > 0:
+        porcentaje_digital = (pagos_digitales / total_pagos) * 100
+        
+    # Mostrar las métricas en 3 columnas
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Vehículos Estacionados Ahora", vehiculos_activos)
+    col2.metric("Recaudación del Día", f"${recaudacion_hoy:,.2f}")
+    col3.metric("Adopción de Pago Digital", f"{porcentaje_digital:.1f}%")
+    
+    st.divider()
+    
+    # --- GRÁFICOS Y TABLAS ---
+    col_grafico, col_tabla = st.columns(2)
+    
+    with col_grafico:
+        st.subheader("Proporción de Métodos de Pago")
+        if total_pagos > 0:
+            # Preparar datos para el gráfico circular
+            conteo_pagos = df_pagos_validos['metodo_pago'].value_counts().reset_index()
+            conteo_pagos.columns = ['Método de Pago', 'Cantidad']
+            
+            # Renombrar para que quede mejor visualmente
+            conteo_pagos['Método de Pago'] = conteo_pagos['Método de Pago'].replace({
+                'digital': 'Mercado Pago (Digital)', 
+                'efectivo': 'Efectivo'
+            })
+            
+            fig = px.pie(
+                conteo_pagos, 
+                values='Cantidad', 
+                names='Método de Pago', 
+                hole=0.4, 
+                color_discrete_sequence=['#00b1ea', '#85bb65'] # Azul Mercado Pago y Verde Efectivo
+            )
+            fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Aún no hay suficientes datos de transacciones finalizadas para mostrar estadísticas de pagos.")
+            
+    with col_tabla:
+        st.subheader("Registro en Tiempo Real")
+        if not df_activos.empty:
+            # Mostrar tabla con la información en vivo
+            tabla_mostrar = df_activos[['patente', 'hora_inicio', 'legajo_permisionario']].copy()
+            
+            # Formatear la hora de inicio para mejor lectura
+            tabla_mostrar['hora_inicio'] = pd.to_datetime(tabla_mostrar['hora_inicio']).dt.strftime('%H:%M:%S (%d/%m)')
+            
+            # Renombrar columnas al español
+            tabla_mostrar.columns = ['Patente', 'Hora de Entrada', 'Legajo Permisionario']
+            
+            st.dataframe(tabla_mostrar, use_container_width=True, hide_index=True)
+        else:
+            st.info("Actualmente no hay vehículos registrados ocupando lugares de estacionamiento.")

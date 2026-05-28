@@ -1,97 +1,134 @@
 import os
-import logging
-from fastapi import FastAPI, Request
+import math
+from datetime import datetime, timezone
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import httpx
-from dotenv import load_dotenv
 
-from services.telegram_client import send_telegram_message, send_chat_action, download_telegram_image
-from services.gemini_service import generate_content_async
+app = FastAPI(title="SEM Express")
 
-# Configuración básica de logs
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Cargar variables de entorno (útil para desarrollo local)
-load_dotenv()
+def obtener_headers_supabase():
+    """Retorna los headers necesarios para la API de Supabase"""
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
 
-MUNICIPAL_CHANNEL_ID = os.getenv("MUNICIPAL_CHANNEL_ID", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+class PeticionIniciarEstacionamiento(BaseModel):
+    patente: str
+    tipo_vehiculo: str  # "auto" o "moto"
+    legajo_permisionario: str
 
-app = FastAPI(title="MuniConecta API")
+class PeticionCalcularCobro(BaseModel):
+    patente: str
+    metodo_pago: str  # "digital" o "efectivo"
 
-@app.post("/webhook")
-async def telegram_webhook(request: Request):
-    """Endpoint para recibir updates (mensajes y fotos) de Telegram."""
-    try:
-        update = await request.json()
-        logger.info(f"Update recibido: {update}")
+@app.post("/iniciar_estacionamiento")
+async def iniciar_estacionamiento(peticion: PeticionIniciarEstacionamiento):
+    if peticion.tipo_vehiculo not in ["auto", "moto"]:
+        raise HTTPException(status_code=400, detail="El tipo de vehículo debe ser 'auto' o 'moto'")
         
-        if "message" in update:
-            message = update["message"]
-            chat_id = message["chat"]["id"]
-            
-            # Enviar acción de "escribiendo..." al usuario
-            await send_chat_action(chat_id)
-            
-            # Obtener texto del mensaje o caption de la foto
-            user_text = message.get("text", "")
-            caption = message.get("caption", "")
-            
-            prompt_text = ""
-            if user_text:
-                prompt_text += user_text + "\n"
-            if caption:
-                prompt_text += caption + "\n"
-                
-            content_parts = []
-            if prompt_text:
-                content_parts.append(prompt_text)
-            else:
-                content_parts.append("Reclamo ciudadano (imagen adjunta)")
-
-            # Procesar foto si fue enviada
-            photos = message.get("photo", [])
-            if photos:
-                # Telegram envía varias resoluciones, tomamos la de mayor calidad (la última)
-                photo = photos[-1]
-                file_id = photo["file_id"]
-                img_bytes = await download_telegram_image(file_id)
-                if img_bytes:
-                    content_parts.append({
-                        "mime_type": "image/jpeg",
-                        "data": img_bytes
-                    })
-            
-            # Invocar a Gemini con el texto y la imagen
-            gemini_text = await generate_content_async(content_parts)
-                
-            # Enviar la respuesta generada al usuario por Telegram
-            await send_telegram_message(chat_id, gemini_text)
-            
-            # Enviar una copia del reporte al canal privado de la municipalidad (Human-in-the-Loop)
-            if MUNICIPAL_CHANNEL_ID:
-                await send_telegram_message(MUNICIPAL_CHANNEL_ID, f"Nuevo Reporte: {user_text}")
-                
-            # Guardar reporte en Supabase
-            if SUPABASE_URL and SUPABASE_KEY:
-                try:
-                    async with httpx.AsyncClient() as sb_client:
-                        headers = {
-                            "apikey": SUPABASE_KEY,
-                            "Authorization": f"Bearer {SUPABASE_KEY}",
-                            "Content-Type": "application/json",
-                            "Prefer": "return=minimal"
-                        }
-                        payload = {"ubicacion": "Reporte de Telegram", "detalle": user_text if user_text else "Reporte con imagen"}
-                        sb_url = f"{SUPABASE_URL}/rest/v1/reclamos"
-                        sb_res = await sb_client.post(sb_url, headers=headers, json=payload)
-                        logger.info(f"Supabase status: {sb_res.status_code}")
-                except Exception as sb_e:
-                    logger.error(f"Error escribiendo en Supabase: {sb_e}")
-            
-    except Exception as e:
-        logger.error(f"Error general en webhook: {e}")
-        # Retornamos 200 siempre en el finally / except para evitar reintentos infinitos de Telegram
+    url = f"{SUPABASE_URL}/rest/v1/estacionamientos"
+    ahora = datetime.now(timezone.utc).isoformat()
+    patente_limpia = peticion.patente.upper().strip()
+    
+    carga_datos = {
+        "patente": patente_limpia,
+        "tipo_vehiculo": peticion.tipo_vehiculo,
+        "legajo_permisionario": peticion.legajo_permisionario,
+        "hora_inicio": ahora,
+        "estado": "activo"
+    }
+    
+    async with httpx.AsyncClient() as cliente:
+        # Verificar si la patente ya tiene un estacionamiento activo
+        url_verificacion = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo"
+        respuesta_verificacion = await cliente.get(url_verificacion, headers=obtener_headers_supabase())
         
-    return {"status": "ok"}
+        if respuesta_verificacion.status_code == 200 and len(respuesta_verificacion.json()) > 0:
+            raise HTTPException(status_code=400, detail="El vehículo ya tiene un estacionamiento activo en curso")
+            
+        # Iniciar estacionamiento
+        respuesta = await cliente.post(url, headers=obtener_headers_supabase(), json=carga_datos)
+        if respuesta.status_code not in [201, 204]:
+            raise HTTPException(status_code=500, detail="Error al guardar el registro en Supabase")
+            
+    return {"mensaje": "Estacionamiento iniciado correctamente", "datos": carga_datos}
+
+@app.post("/calcular_cobro")
+async def calcular_cobro(peticion: PeticionCalcularCobro):
+    if peticion.metodo_pago not in ["digital", "efectivo"]:
+        raise HTTPException(status_code=400, detail="El método de pago debe ser 'digital' o 'efectivo'")
+        
+    url = f"{SUPABASE_URL}/rest/v1/estacionamientos"
+    patente_limpia = peticion.patente.upper().strip()
+    
+    async with httpx.AsyncClient() as cliente:
+        # Buscar el estacionamiento activo para esta patente
+        url_busqueda = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo&select=*"
+        respuesta_busqueda = await cliente.get(url_busqueda, headers=obtener_headers_supabase())
+        
+        if respuesta_busqueda.status_code != 200 or len(respuesta_busqueda.json()) == 0:
+            raise HTTPException(status_code=404, detail="No se encontró un estacionamiento activo para esta patente")
+            
+        registro = respuesta_busqueda.json()[0]
+        tipo_vehiculo = registro.get("tipo_vehiculo")
+        hora_inicio_str = registro.get("hora_inicio")
+        
+        # Procesar fechas y tiempos
+        hora_inicio = datetime.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
+        hora_fin = datetime.now(timezone.utc)
+        
+        delta_tiempo = hora_fin - hora_inicio
+        minutos_transcurridos = delta_tiempo.total_seconds() / 60
+        
+        # Lógica de negocio estricta
+        tarifa_base = 700 if tipo_vehiculo == "auto" else 300
+        costo_total = 0
+        
+        if minutos_transcurridos < 5:
+            # Tolerancia de 5 minutos
+            costo_total = 0
+        elif minutos_transcurridos <= 60:
+            # Primera hora se cobra completa
+            costo_total = tarifa_base
+        else:
+            # A partir de la segunda hora, se cobra fraccionado cada 15 minutos exactos
+            minutos_adicionales = minutos_transcurridos - 60
+            fracciones_15_minutos = math.ceil(minutos_adicionales / 15)
+            costo_total = tarifa_base + (fracciones_15_minutos * (tarifa_base / 4))
+            
+        # Incentivo digital: 20% de descuento
+        if peticion.metodo_pago == "digital" and costo_total > 0:
+            costo_total = costo_total * 0.8
+            
+        # Actualizar el registro en Supabase asegurando la trazabilidad
+        ahora_iso = hora_fin.isoformat()
+        carga_actualizacion = {
+            "estado": "finalizado",
+            "hora_fin": ahora_iso,
+            "monto_final": costo_total,
+            "metodo_pago": peticion.metodo_pago
+        }
+        
+        # Usamos update/patch buscando por patente y estado activo
+        url_actualizacion = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo"
+        headers_patch = obtener_headers_supabase()
+        headers_patch["Prefer"] = "return=representation"
+        
+        respuesta_actualizacion = await cliente.patch(url_actualizacion, headers=headers_patch, json=carga_actualizacion)
+        
+        if respuesta_actualizacion.status_code not in [200, 204]:
+            raise HTTPException(status_code=500, detail="Error al actualizar el registro del cobro en Supabase")
+            
+    return {
+        "mensaje": "Estacionamiento finalizado y cobro calculado",
+        "patente": patente_limpia,
+        "tiempo_transcurrido_minutos": round(minutos_transcurridos, 2),
+        "monto_final": costo_total,
+        "metodo_pago": peticion.metodo_pago
+    }
