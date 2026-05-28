@@ -1,10 +1,14 @@
 import os
 import math
 from datetime import datetime, timezone, timedelta
-from fastapi import FastAPI, HTTPException
+import logging
+import asyncio
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = FastAPI(title="SEM Express")
 
