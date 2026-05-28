@@ -1,6 +1,6 @@
 import os
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import httpx
@@ -10,6 +10,9 @@ app = FastAPI(title="SEM Express")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+# 1. ZONA HORARIA ARGENTINA (UTC-3)
+TZ_ARG = timezone(timedelta(hours=-3))
+
 def obtener_headers_supabase():
     """Retorna los headers necesarios para la API de Supabase"""
     return {
@@ -17,6 +20,29 @@ def obtener_headers_supabase():
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json"
     }
+
+# 2. FUNCIÓN DE VALIDACIÓN DE HORARIOS (ORDENANZA 12.170)
+def es_horario_cobrable(fecha_hora: datetime) -> bool:
+    dia_semana = fecha_hora.weekday() # Lunes: 0, Domingo: 6
+    hora = fecha_hora.time()
+    hora_actual = hora.hour + hora.minute / 60.0 # Hora decimal (ej. 14:30 -> 14.5)
+    
+    # Turno Nocturno: Todos los días entre las 22:00 y las 05:00 del día siguiente
+    if hora_actual >= 22.0 or hora_actual < 5.0:
+        return True
+        
+    # Turno Diurno:
+    # Lunes a Viernes (0-4) de 07:00 a 21:00
+    if dia_semana <= 4:
+        if 7.0 <= hora_actual < 21.0:
+            return True
+            
+    # Sábados (5) de 07:00 a 14:00
+    if dia_semana == 5:
+        if 7.0 <= hora_actual < 14.0:
+            return True
+            
+    return False
 
 class PeticionIniciarEstacionamiento(BaseModel):
     patente: str
@@ -29,18 +55,27 @@ class PeticionCalcularCobro(BaseModel):
 
 @app.post("/iniciar_estacionamiento")
 async def iniciar_estacionamiento(peticion: PeticionIniciarEstacionamiento):
+    ahora = datetime.now(TZ_ARG)
+    
+    # 3. INYECTAR VALIDACIÓN
+    if not es_horario_cobrable(ahora):
+        raise HTTPException(
+            status_code=400, 
+            detail="El estacionamiento es libre y gratuito en este horario y día de la semana según la Ordenanza 12.170. No se requiere iniciar registro."
+        )
+
     if peticion.tipo_vehiculo not in ["auto", "moto"]:
         raise HTTPException(status_code=400, detail="El tipo de vehículo debe ser 'auto' o 'moto'")
         
     url = f"{SUPABASE_URL}/rest/v1/estacionamientos"
-    ahora = datetime.now(timezone.utc).isoformat()
+    ahora_iso = ahora.isoformat()
     patente_limpia = peticion.patente.upper().strip()
     
     carga_datos = {
         "patente": patente_limpia,
         "tipo_vehiculo": peticion.tipo_vehiculo,
         "legajo_permisionario": peticion.legajo_permisionario,
-        "hora_inicio": ahora,
+        "hora_inicio": ahora_iso,
         "estado": "activo"
     }
     
@@ -81,7 +116,7 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
         
         # Procesar fechas y tiempos
         hora_inicio = datetime.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
-        hora_fin = datetime.now(timezone.utc)
+        hora_fin = datetime.now(TZ_ARG)
         
         delta_tiempo = hora_fin - hora_inicio
         minutos_transcurridos = delta_tiempo.total_seconds() / 60
@@ -115,7 +150,6 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
             "metodo_pago": peticion.metodo_pago
         }
         
-        # Usamos update/patch buscando por patente y estado activo
         url_actualizacion = f"{url}?patente=eq.{patente_limpia}&estado=eq.activo"
         headers_patch = obtener_headers_supabase()
         headers_patch["Prefer"] = "return=representation"
@@ -125,10 +159,14 @@ async def calcular_cobro(peticion: PeticionCalcularCobro):
         if respuesta_actualizacion.status_code not in [200, 204]:
             raise HTTPException(status_code=500, detail="Error al actualizar el registro del cobro en Supabase")
             
+    # 4. INTEGRACIÓN MERCADO PAGO (MOCK)
+    link_pago_mp = "https://mpago.la/mock_punatech_2026" if peticion.metodo_pago == "digital" else None
+
     return {
         "mensaje": "Estacionamiento finalizado y cobro calculado",
         "patente": patente_limpia,
         "tiempo_transcurrido_minutos": round(minutos_transcurridos, 2),
         "monto_final": costo_total,
-        "metodo_pago": peticion.metodo_pago
+        "metodo_pago": peticion.metodo_pago,
+        "link_pago_mp": link_pago_mp
     }
