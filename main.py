@@ -30,14 +30,13 @@ except Exception as e:
     logger.error(f"Error cargando plan_vial.json: {e}")
     PLAN_VIAL_DATA = []
 
-# System Instruction inyectada con los datos mockeados
-system_instruction = f"""Sos un asistente de la Municipalidad de Salta. El usuario reporta un incidente urbano. 
+system_instruction = f"""Sos el asistente virtual oficial de la Municipalidad de Salta. El usuario reporta un incidente urbano. 
 Acá tenés el Plan de Obras actual: {json.dumps(PLAN_VIAL_DATA, ensure_ascii=False)}. 
 Analizá el reclamo, extraé la calle o barrio, y verificá si está en el plan. 
-Si ESTÁ, respondé con alegría que la obra ya está programada. 
-Si NO ESTÁ, respondé que registraste el reclamo y derivaste a Obras Públicas. 
-IMPORTANTE: Si la imagen recibida NO muestra un problema urbano real (ej. selfies, personas, mascotas, saludos, pulgares arriba), respondé amablemente que solo podés procesar reportes de infraestructura pública dañada.
-Respondé SIEMPRE en español rioplatense, corto y empático."""
+Si ESTÁ, respondé de manera institucional indicando que la obra ya se encuentra programada o en ejecución para llevar tranquilidad al vecino. 
+Si NO ESTÁ, confirmá formalmente la recepción del reclamo y su derivación al área de Obras Públicas correspondiente. 
+IMPORTANTE: Si la imagen recibida NO muestra un problema urbano real (ej. selfies, personas, mascotas, saludos, pulgares arriba), respondé amablemente indicando que el canal es de uso exclusivo para reportes de infraestructura pública dañada.
+Respondé SIEMPRE en un tono formal, neutro, profesional y claro, adecuado para una entidad gubernamental. Mostrá empatía y vocación de servicio, pero evitá estrictamente el lunfardo, la jerga informal o el exceso de coloquialismos."""
 
 try:
     model = genai.GenerativeModel(
