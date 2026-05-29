@@ -1,14 +1,17 @@
 import os
+
 from dotenv import load_dotenv
+
 load_dotenv()
 
-import streamlit as st
-import pandas as pd
-import requests
-from datetime import datetime, timezone
-import plotly.express as px
+from datetime import UTC, datetime
+
 import google.generativeai as genai
 import numpy as np
+import pandas as pd
+import plotly.express as px
+import requests
+import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 # Actualiza el dashboard cada 10 segundos automáticamente simulando Real-Time
@@ -81,6 +84,7 @@ st.markdown("""
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+API_KEY = os.getenv("API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
@@ -93,11 +97,18 @@ def obtener_headers_supabase():
         "Content-Type": "application/json"
     }
 
+def _api_headers():
+    headers = {}
+    if API_KEY:
+        headers["X-API-Key"] = API_KEY
+    return headers
+
+
 def cargar_datos_estacionamientos():
     if not SUPABASE_URL or not SUPABASE_KEY:
         st.error("Credenciales de Supabase no configuradas. Revisa las variables de entorno.")
         return []
-        
+
     url = f"{SUPABASE_URL}/rest/v1/estacionamientos?select=*"
     respuesta = requests.get(url, headers=obtener_headers_supabase())
     if respuesta.status_code == 200:
@@ -129,71 +140,73 @@ with st.sidebar:
     st.header("📱 App Permisionario")
     st.markdown("Simulador de la app en calle")
     st.link_button("💬 Abrir Bot en Telegram", "https://t.me/MuniConecta_Bot", use_container_width=True)
-    
+
     st.subheader("📸 Escáner OCR Inteligente")
     if st.button("📷 Simular Lectura de Patente"):
         with st.spinner("Analizando imagen..."):
             try:
-                res = requests.post(f"{API_URL}/escanear_patente", json={"imagen_base64": "mock_data"})
+                res = requests.post(f"{API_URL}/escanear_patente", json={"imagen_base64": "mock_data"}, headers=_api_headers())
                 if res.status_code == 200:
                     data = res.json()
                     st.success(f"✅ Patente: {data['patente_detectada']} (Confianza: {data['confianza']*100}%)")
                     st.info(data['mensaje'])
                 else:
                     st.error("Error en el reconocimiento")
-            except Exception as e:
+            except Exception:
                 st.error("Fallo de conexión OCR.")
-                
+
     st.divider()
-    
+
     st.subheader("1. Entrada de Vehículo")
     with st.form("form_iniciar"):
         patente = st.text_input("Patente (Ej: AB123CD)").upper()
         tipo = st.selectbox("Tipo", ["auto", "moto"])
         legajo = st.text_input("Tu Legajo", value="INSP-01")
         submit_iniciar = st.form_submit_button("✅ Iniciar Estacionamiento")
-        
+
         if submit_iniciar:
             if patente:
                 with st.spinner("Registrando..."):
                     try:
                         res = requests.post(
                             f"{API_URL}/iniciar_estacionamiento",
-                            json={"patente": patente, "tipo_vehiculo": tipo, "legajo_permisionario": legajo}
+                            json={"patente": patente, "tipo_vehiculo": tipo, "legajo_permisionario": legajo},
+                            headers=_api_headers(),
                         )
                         if res.status_code == 200:
                             st.success("¡Vehículo registrado!")
                         else:
                             st.error(res.json().get("detail", "Error de API"))
-                    except Exception as e:
+                    except Exception:
                         st.error("Fallo de conexión con la nube.")
             else:
                 st.warning("Escribe una patente.")
 
     st.divider()
-    
+
     st.subheader("2. Salida y Cobro")
     with st.form("form_cobrar"):
         patente_cobro = st.text_input("Patente a retirar").upper()
         metodo = st.selectbox("Método de Pago", ["digital", "efectivo"])
         submit_cobrar = st.form_submit_button("💸 Calcular y Cobrar")
-        
+
         if submit_cobrar:
             if patente_cobro:
                 with st.spinner("Calculando..."):
                     try:
                         res = requests.post(
                             f"{API_URL}/calcular_cobro",
-                            json={"patente": patente_cobro, "metodo_pago": metodo}
+                            json={"patente": patente_cobro, "metodo_pago": metodo},
+                            headers=_api_headers(),
                         )
                         if res.status_code == 200:
                             data = res.json()
                             st.success(f"Total a cobrar: ${data['monto_final']}")
-                            if data.get('link_pago'):
+                            if data.get('link_pago_mp'):
                                 st.markdown(f"[💳 Abrir Link de Pago]({data['link_pago']})")
                         else:
                             st.error(res.json().get("detail", "Auto no encontrado"))
-                    except Exception as e:
+                    except Exception:
                         st.error("Fallo de conexión.")
             else:
                 st.warning("Escribe la patente.")
@@ -209,47 +222,47 @@ elif not datos:
     st.info("No hay datos de estacionamientos registrados en el sistema.")
 else:
     df = pd.DataFrame(datos)
-    
+
     columnas_esperadas = ["estado", "monto_final", "metodo_pago", "hora_inicio", "hora_fin", "patente", "legajo_permisionario"]
     for col in columnas_esperadas:
         if col not in df.columns:
             df[col] = None
-            
+
     df['monto_final'] = pd.to_numeric(df['monto_final'], errors='coerce').fillna(0)
-    
+
     df['hora_inicio_dt'] = pd.to_datetime(df['hora_inicio'], errors='coerce')
     df['fecha_inicio'] = df['hora_inicio_dt'].dt.date
     df['hora_fin_dt'] = pd.to_datetime(df['hora_fin'], errors='coerce')
     df['fecha_fin'] = df['hora_fin_dt'].dt.date
     df['fecha_fin'] = df['fecha_fin'].fillna(df['fecha_inicio'])
-    
-    hoy = datetime.now(timezone.utc).date()
-    
+
+    hoy = datetime.now(UTC).date()
+
     df_activos = df[df['estado'] == 'activo']
     vehiculos_activos = len(df_activos)
-    
+
     df_finalizados_hoy = df[(df['estado'] == 'finalizado') & (df['fecha_fin'] == hoy)]
     recaudacion_cerrada = df_finalizados_hoy['monto_final'].sum()
-    
+
     deuda_activa = df_activos['monto_final'].sum()
     recaudacion_hoy = recaudacion_cerrada + deuda_activa
-    
+
     df_pagos_validos = df[(df['estado'] == 'finalizado') & (df['metodo_pago'].notna()) & (df['metodo_pago'] != "")]
     total_pagos = len(df_pagos_validos)
     pagos_digitales = len(df_pagos_validos[df_pagos_validos['metodo_pago'] == 'digital'])
-    
+
     porcentaje_digital = 0.0
     if total_pagos > 0:
         porcentaje_digital = (pagos_digitales / total_pagos) * 100
-        
+
     st.write("") # Espaciador
     col1, col2, col3 = st.columns(3)
     col1.metric("🚗 Estacionados Ahora", vehiculos_activos)
     col2.metric("💰 Recaudación del Día", f"${recaudacion_hoy:,.2f}")
     col3.metric("📱 Adopción Pago Digital", f"{porcentaje_digital:.1f}%")
-    
+
     st.divider()
-    
+
     st.subheader("🗺️ Mapa de Ocupación en Tiempo Real (Microcentro Salta)")
     if not df_activos.empty:
         df_map = df_activos.copy()
@@ -258,10 +271,10 @@ else:
         st.map(df_map[['lat', 'lon']], zoom=14)
     else:
         st.info("No hay vehículos estacionados para mostrar en el mapa.")
-        
+
     st.write("<br>", unsafe_allow_html=True)
     st.subheader("🤖 Intendente AI - Análisis Ejecutivo")
-    
+
     if st.button("Generar Reporte Estratégico con IA"):
         if not GEMINI_API_KEY:
             st.error("⚠️ Falta configurar GEMINI_API_KEY en el archivo .env")
@@ -274,41 +287,41 @@ else:
                     st.info(respuesta.text)
                 except Exception as e:
                     st.error(f"Error al generar el reporte: {e}")
-                    
+
     st.write("<br>", unsafe_allow_html=True)
-    
+
     st.subheader("⚙️ Administración del Sistema")
     if st.button("⚠️ Ejecutar Cierre Diario Forzado"):
         with st.spinner("Cerrando sesiones activas..."):
             try:
-                res = requests.post(f"{API_URL}/cierre_diario_forzado")
+                res = requests.post(f"{API_URL}/cierre_diario_forzado", headers=_api_headers())
                 if res.status_code == 200:
                     st.success(res.json().get("mensaje", "Cierre ejecutado"))
                     st.rerun()
                 else:
                     st.error("Error al ejecutar cierre")
-            except Exception as e:
+            except Exception:
                 st.error("Error de conexión.")
-                
+
     st.write("<br>", unsafe_allow_html=True)
-    
+
     col_grafico, col_tabla = st.columns(2, gap="large")
-    
+
     with col_grafico:
         st.subheader("📊 Métodos de Pago")
         if total_pagos > 0:
             conteo_pagos = df_pagos_validos['metodo_pago'].value_counts().reset_index()
             conteo_pagos.columns = ['Método de Pago', 'Cantidad']
             conteo_pagos['Método de Pago'] = conteo_pagos['Método de Pago'].replace({
-                'digital': 'Mercado Pago', 
+                'digital': 'Mercado Pago',
                 'efectivo': 'Efectivo'
             })
-            
+
             fig = px.pie(
-                conteo_pagos, 
-                values='Cantidad', 
-                names='Método de Pago', 
-                hole=0.5, 
+                conteo_pagos,
+                values='Cantidad',
+                names='Método de Pago',
+                hole=0.5,
                 color_discrete_sequence=['#00b1ea', '#85bb65']
             )
             fig.update_layout(
@@ -321,14 +334,14 @@ else:
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Sin datos suficientes para métricas.")
-            
+
     with col_tabla:
         st.subheader("📡 Radar en Tiempo Real")
         if not df_activos.empty:
             tabla_mostrar = df_activos[['patente', 'hora_inicio', 'legajo_permisionario']].copy()
             tabla_mostrar['hora_inicio'] = pd.to_datetime(tabla_mostrar['hora_inicio']).dt.strftime('%H:%M:%S')
             tabla_mostrar.columns = ['Patente', 'Hora Entrada', 'Permisionario']
-            
+
             st.dataframe(tabla_mostrar, use_container_width=True, hide_index=True, height=400)
         else:
             st.info("Plazas de estacionamiento liberadas.")

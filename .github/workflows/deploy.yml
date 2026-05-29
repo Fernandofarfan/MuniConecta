@@ -1,22 +1,52 @@
 name: Deploy to Cloud Run
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 jobs:
-  test-and-deploy:
+  lint-and-test:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    - name: Install dependencies
-      run: pip install -r requirements.txt
-    - name: Run Pytest
-      run: pytest test_api.py
-    - name: Google Auth (Mock)
-      run: echo "Autenticación WIF configurada en entorno de producción real"
-    - name: Build and Deploy to Cloud Run
-      run: echo "Despliegue simulado exitoso post-testing"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run Ruff linter
+        run: ruff check .
+      - name: Run tests
+        run: pytest tests/ -v
+
+  build-and-deploy:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+      - name: Build and push Docker image
+        run: |
+          IMAGE="us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/municonecta/sem-express:${{ github.sha }}"
+          docker build -t $IMAGE .
+          docker push $IMAGE
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy municonecta-service \
+            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/municonecta/sem-express:${{ github.sha }} \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --min-instances 1 \
+            --max-instances 10 \
+            --concurrency 80 \
+            --set-env-vars "API_URL=https://municonecta-service-728832414144.us-central1.run.app"

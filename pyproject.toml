@@ -1,0 +1,24 @@
+[project]
+name = "sem-express"
+version = "1.0.0"
+description = "Sistema de Estacionamiento Medido Municipal"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+exclude = ["venv", ".venv", "__pycache__", ".git", "main.py", "dashboard.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "C4"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

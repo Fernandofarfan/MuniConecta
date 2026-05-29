@@ -9,7 +9,23 @@ __pycache__/
 
 # Variables de entorno y secretos
 .env
+*.env.local
+*.env.prod
 
 # Archivos de SO
 .DS_Store
 Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Distribucion
+dist/
+build/
+*.egg-info/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
