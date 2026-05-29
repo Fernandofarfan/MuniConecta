@@ -1,75 +1,274 @@
 # SEM Express - Sistema de Estacionamiento Medido
 
-SEM Express es un sistema integral para la gestión y cobro de estacionamiento medido municipal. Consta de una API robusta y un panel de control en tiempo real para visualizar las métricas clave.
+Sistema integral para la gestion y cobro de estacionamiento medido municipal de la Ciudad de Salta.
 
-## 🛠️ Tecnologías Utilizadas
-- **Backend:** FastAPI, Python, Supabase (REST API vía httpx)
-- **Frontend / Panel de Control:** Streamlit, Pandas, Plotly
-- **Base de Datos:** Supabase (PostgreSQL)
+[![Tests](https://github.com/Fernandofarfan/MuniConecta/actions/workflows/deploy.yml/badge.svg)](https://github.com/Fernandofarfan/MuniConecta/actions/workflows/deploy.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)](https://fastapi.tiangolo.com/)
 
-## 🚀 Características Principales
-- **Inicio de Estacionamiento:** Registro en tiempo real de vehículos (autos y motos).
-- **Cálculo de Cobro Estricto:**
-  - Tolerancia de 5 minutos sin cargo.
-  - Primera hora completa, luego fraccionado cada 15 minutos exactos.
-  - Descuento del 20% aplicable para pagos digitales (Mercado Pago).
-- **Panel de Control en Vivo:**
-  - Métricas de vehículos estacionados, recaudación del día y adopción de pagos digitales.
-  - Gráficos interactivos de métodos de pago.
-  - Tabla de registros activos en tiempo real.
-- 🌟 **Innovaciones (Fase 2):**
-  - Escaneo de Patentes vía OCR.
-  - Cierre Automático de Sesiones (Cronjob).
-  - Bot de Telegram para consultas de conductores.
+---
 
-## 💻 Instalación y Uso Local
+## Arquitectura
 
-### 1. Configurar Variables de Entorno
-Crea un archivo `.env` en la raíz del proyecto con tus credenciales de Supabase:
+```
+MuniConecta/
+├── app/
+│   ├── main.py                  # Entry point FastAPI con lifespan (scheduler + anomaly monitor)
+│   ├── config.py                # Variables de entorno y constantes de negocio
+│   ├── auth.py                  # API Key + JWT (inspectores) + rate limiting
+│   ├── database.py              # Capa de abstraccion Supabase (6 clases)
+│   ├── logging_config.py        # Structured JSON logging
+│   ├── websocket_manager.py     # WebSocket broadcast con manejo de desconexion
+│   ├── models/schemas.py        # Pydantic models con validacion de patente argentina
+│   ├── routers/ (16 modulos)
+│   │   ├── estacionamiento.py   # /iniciar, /cobrar, /deuda
+│   │   ├── zonas.py             # CRUD zonas + ocupacion en tiempo real
+│   │   ├── auth.py              # JWT login inspectores
+│   │   ├── pagos.py             # MercadoPago + webhook + comprobantes
+│   │   ├── infracciones.py      # Emision y consulta de multas
+│   │   ├── tarifas.py           # Tarifas especiales/dinamicas
+│   │   ├── analiticas.py        # Estadisticas historicas
+│   │   ├── anomalias.py         # Deteccion de anomalias + prediccion demanda
+│   │   ├── ciudadanos.py        # Registro ciudadanos Telegram
+│   │   ├── dnrpa.py             # Lookup DNRPA
+│   │   ├── qr_portal.py         # Portal de pago ciudadano (/p/{id})
+│   │   ├── inspector_pwa.py     # PWA offline para inspectores
+│   │   ├── ocr.py               # Reconocimiento de patentes
+│   │   ├── admin.py             # Cierre diario + reportes
+│   │   └── health.py            # Health check
+│   ├── services/ (14 modulos)
+│   │   ├── pricing.py           # Calculo de tarifas unificado
+│   │   ├── schedule.py          # Ordenanza 12.170
+│   │   ├── cierre_diario.py     # Cierre masivo de sesiones
+│   │   ├── mercadopago.py       # SDK MercadoPago + verificacion firma
+│   │   ├── comprobante.py       # PDF fiscal con ReportLab
+│   │   ├── ocr_engine.py        # Google Cloud Vision (mock fallback)
+│   │   ├── notificador.py       # Notificaciones Telegram
+│   │   ├── scheduler.py         # Cierre diario automatico 23:55
+│   │   ├── dnrpa_lookup.py      # Consulta DNRPA (mock)
+│   │   ├── anomaly_detector.py  # Deteccion de anomalias operativas
+│   │   ├── tarifas_especiales.py # Tarifas por eventos
+│   │   ├── qr_generator.py      # QR para pago ciudadano
+│   │   ├── reporte_ejecutivo.py # PDF ejecutivo mensual
+│   │   ├── alert_manager.py     # Alertas multicanal
+│   │   └── predictive_analytics.py # Prediccion de demanda
+│   └── static/inspector/        # PWA (manifest.json, sw.js)
+├── supabase/migrations/         # 5 migraciones SQL versionadas
+├── tests/                       # 79 tests en 11 archivos
+├── dashboard.py                 # Streamlit dashboard con UX premium
+├── bot_telegram.py              # Bot Telegram con 7 comandos
+├── Dockerfile                   # Python 3.11-slim, Cloud Run
+├── main.tf                      # Terraform IaC GCP
+├── pyproject.toml               # Ruff + Pytest config
+└── requirements.txt             # 20 dependencias versionadas
+```
+
+---
+
+## Tecnologias
+
+| Capa | Stack |
+|------|-------|
+| **API** | FastAPI, Uvicorn, Pydantic v2, slowapi |
+| **Auth** | API Key + JWT (python-jose, passlib/bcrypt) |
+| **DB** | Supabase PostgreSQL via httpx REST API |
+| **Dashboard** | Streamlit, Pandas, Plotly, NumPy |
+| **IA** | Google Gemini 2.5 Flash (reportes ejecutivos) |
+| **Pagos** | MercadoPago SDK + Webhook IPN |
+| **OCR** | Google Cloud Vision (mock fallback) |
+| **PDF** | ReportLab (comprobantes + reportes) |
+| **QR** | qrcode + Pillow |
+| **Mensajeria** | python-telegram-bot async |
+| **Scheduler** | APScheduler (cierre diario automatico) |
+| **Infra** | Docker, Terraform, GCP Cloud Run |
+| **CI/CD** | GitHub Actions (ruff + pytest + deploy) |
+
+---
+
+## Caracteristicas (19 features)
+
+### Nucleo
+- **Registro de estacionamiento** con validacion de patente argentina (3 formatos), GPS y zona
+- **Calculo de cobro estricto** segun Ordenanza 12.170 (tolerancia 5 min, fracciones 15 min, 20% desc. digital)
+- **Validacion de horarios cobrables** (lun-vie 7-21, sab 7-14, nocturno 22-5)
+
+### Panel de Control
+- Metricas en tiempo real (vehiculos, recaudacion, adopcion digital)
+- Mapa de ocupacion con coordenadas reales
+- Grafico de tendencias 30 dias
+- Ocupacion por zona tarifaria
+- Reporte ejecutivo con IA (Gemini)
+- Alertas de anomalias operativas en vivo
+
+### Pagos y Fiscalizacion
+- **MercadoPago**: preferencias de pago + webhook IPN + verificacion de firma
+- **Comprobantes PDF**: tickets fiscales con ReportLab
+- **Infracciones**: emision de multas con foto evidencia, consulta ciudadana
+- **Tarifas dinamicas**: precios especiales por eventos con multiplicador
+
+### Ciudadanos
+- **Telegram Bot**: `/deuda`, `/registrar`, `/mis_patentes`, `/desregistrar`, `/multas`, `/dnrpa`
+- **Portal QR**: web mobile responsiva para pago sin app (`/p/{session_id}`)
+- **Notificaciones proactivas**: aviso al iniciar estacionamiento
+
+### Inspectores
+- **Auth JWT**: login con legajo/password, roles (inspector/supervisor/admin)
+- **OCR**: reconocimiento de patentes via Cloud Vision
+- **PWA offline**: app progresiva con service worker para uso sin conexion
+- **DNRPA**: consulta de registro nacional de automotor
+
+### Operaciones
+- **Cierre diario automatico**: scheduler a las 23:55 ARG
+- **Deteccion de anomalias**: saturacion de zonas, sesiones prolongadas, cada 5 min
+- **Prediccion de demanda**: por zona/hora basado en 30 dias historicos
+- **Alertas multicanal**: Telegram + email + SMS con escalacion por severidad
+- **Analiticas historicas**: endpoint con agrupacion por dia/hora/semana
+- **Reporte ejecutivo PDF**: multi-pagina con resumen, graficos y conclusiones IA
+
+### DevOps
+- **API versioning**: `/v1/` prefix en todas las rutas
+- **Migraciones SQL**: 5 archivos versionados para Supabase
+- **Structured JSON logging**: timestamp, severity, trace_id, exception
+- **Rate limiting**: slowapi en todos los endpoints
+- **79 tests**: unitarios + integracion con pytest
+- **CI/CD**: ruff linting + pytest + deploy a Cloud Run
+
+---
+
+## Instalacion
+
+### 1. Variables de entorno
+
 ```env
-SUPABASE_URL=tu_url_de_supabase
-SUPABASE_KEY=tu_anon_key_de_supabase
-GEMINI_API_KEY=tu_api_key_de_gemini
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_KEY=sb_publishable_tu_key
+GEMINI_API_KEY=tu_api_key_gemini
+TELEGRAM_BOT_TOKEN=tu_bot_token
+API_KEY=tu_api_key_secreta
+JWT_SECRET=tu_jwt_secret
+API_URL=http://127.0.0.1:8000
+
+# Opcionales
+MERCADOPAGO_ACCESS_TOKEN=tu_mp_token
+MERCADOPAGO_WEBHOOK_SECRET=tu_mp_webhook_secret
+GOOGLE_APPLICATION_CREDENTIALS=ruta_a_credenciales.json
 ```
 
-### 2. Instalar Dependencias
-Asegúrate de tener un entorno virtual activo e instala las dependencias necesarias.
-Ejemplo de dependencias clave requeridas:
+### 2. Dependencias
+
 ```bash
-pip install fastapi uvicorn httpx pydantic streamlit pandas plotly requests
+pip install -r requirements.txt
+pip install -r requirements-dev.txt  # testing + linting
 ```
 
-### 3. Ejecutar los Servicios
+### 3. Base de datos
 
-**Iniciar la API (FastAPI):**
-```bash
-fastapi dev main.py
-# o alternativamente:
-uvicorn main:app --reload
-```
+Ejecuta las migraciones en orden desde `supabase/migrations/` en el SQL Editor de Supabase.
 
-**Iniciar el Panel de Control (Streamlit):**
+### 4. Ejecutar
+
 ```bash
+# API
+uvicorn app.main:app --reload
+
+# Dashboard
 streamlit run dashboard.py
+
+# Bot Telegram
+python bot_telegram.py
+
+# Tests
+pytest tests/ -v
+
+# Lint
+ruff check .
 ```
 
-## 🏗️ Estructura de la Base de Datos (Supabase)
-Para que el sistema funcione correctamente, se requiere una tabla llamada `estacionamientos` con la siguiente estructura:
-- `id` (uuid o int8, primary key, auto-generado)
-- `patente` (text)
-- `tipo_vehiculo` (text: 'auto' o 'moto')
-- `legajo_permisionario` (text)
-- `hora_inicio` (timestamptz)
-- `hora_fin` (timestamptz, nullable)
-- `estado` (text: 'activo' o 'finalizado')
-- `monto_final` (numeric, nullable)
-- `metodo_pago` (text, nullable: 'digital' o 'efectivo')
+---
 
-## 🛡️ Arquitectura e Infraestructura (DevOps)
-El despliegue de SEM Express está diseñado bajo estándares empresariales:
-- **Infraestructura como Código (IaC):** Todo el entorno de Google Cloud (Cloud Run, IAM) se gestiona mediante **Terraform** (`main.tf`), garantizando reproducibilidad y control de versiones.
-- **Alta Disponibilidad:** El servicio Cloud Run está configurado con Auto-Scaling (min 1, max 10) para evitar "Cold Starts" y soportar picos de concurrencia durante los cambios de turno (hasta 80 request simultáneos por instancia).
-- **Procesamiento Asíncrono:** Uso de `BackgroundTasks` de FastAPI para el cierre masivo de jornadas, previniendo cuellos de botella y *timeouts* en el servidor.
-- **TDD & QA Automático:** Suite de pruebas unitarias con `pytest` integradas en el pipeline de GitHub Actions (`deploy.yml`) para garantizar cero regresiones en cada despliegue.
-- **Patrones de Diseño:** Uso de Dependency Injection en FastAPI para manejar las credenciales, facilitando el testing y la modularidad.
-- **Arquitectura Event-Driven (Preparada):** Implementación de WebSockets (`/ws/dashboard`) para permitir notificaciones Push en tiempo real a clientes conectados, reduciendo el polling a la base de datos.
+## API Reference (v1)
+
+```
+GET  /v1/                                    # Root con lista de endpoints
+GET  /health                                 # Health check
+
+# Estacionamiento
+POST /v1/estacionamiento/iniciar             # GPS + zona opcionales
+POST /v1/estacionamiento/cobrar              # Calculo + finalizacion
+POST /v1/estacionamiento/deuda               # Consulta sin finalizar
+
+# Zonas
+GET  /v1/zonas                               # Listar zonas
+POST /v1/zonas                               # Crear zona
+GET  /v1/zonas/ocupacion                     # Capacidad en tiempo real
+
+# Auth
+POST /v1/auth/login                          # JWT inspectores
+
+# Pagos
+POST /v1/pagos/crear                         # Preferencia MercadoPago
+POST /v1/pagos/webhook                       # IPN MercadoPago
+GET  /v1/pagos/comprobante/{id}              # Descargar PDF
+
+# Infracciones
+POST /v1/infracciones/emitir                 # Emitir multa
+GET  /v1/infracciones/consultar?patente=X    # Consultar multas
+GET  /v1/infracciones/multas/{patente}       # Multas ciudadano (public)
+
+# Tarifas
+GET  /v1/tarifas/activas                     # Tarifas especiales vigentes
+POST /v1/tarifas/especiales                  # Crear tarifa especial
+
+# Analiticas
+GET  /v1/analiticas/estadisticas             # ?desde=&hasta=&agrupacion=dia|hora|semana
+
+# Anomalias
+GET  /v1/anomalias                           # Deteccion en tiempo real
+GET  /v1/anomalias/prediccion-demanda        # Prediccion por zona/hora
+
+# DNRPA
+GET  /v1/dnrpa/{patente}                     # Consulta registro automotor
+
+# Ciudadanos
+POST /v1/ciudadanos/registrar                # Vincular Telegram
+GET  /v1/ciudadanos/buscar?patente=X         # Buscar ciudadano
+
+# OCR
+POST /v1/escanear_patente                    # Reconocimiento de imagen
+
+# Admin
+POST /v1/cierre_diario_forzado               # Cierre manual (respaldo)
+
+# Publico
+GET  /p/{session_id}                         # Portal de pago QR ciudadano
+GET  /inspector/                             # PWA inspector
+```
+
+---
+
+## WebSocket
+
+```
+ws://host/ws/dashboard
+```
+
+Eventos broadcast:
+- `{"event": "update_dashboard"}` - Datos actualizados
+- `{"event": "anomalias", "data": [...]}` - Anomalias detectadas
+- `{"event": "cierre_diario", "resultado": {...}}` - Cierre completado
+
+---
+
+## Base de Datos (8 tablas)
+
+| Tabla | Descripcion |
+|-------|-------------|
+| `estacionamientos` | Sesiones de estacionamiento con GPS, zona, DNRPA |
+| `zonas` | Zonas tarifarias con capacidad |
+| `inspectores` | Usuarios con roles y JWT |
+| `ciudadanos` | Vinculacion Telegram-patentes |
+| `infracciones` | Multas con foto evidencia |
+| `tarifas_especiales` | Precios por eventos |
+| `anomalias` | Registro de anomalias detectadas |
+| `cierre_diario_log` | Historial de cierres automaticos |
+| `comprobantes` | Tickets fiscales generados |
