@@ -20,7 +20,7 @@ MuniConecta/
 │   ├── logging_config.py        # Structured JSON logging
 │   ├── websocket_manager.py     # WebSocket broadcast con manejo de desconexion
 │   ├── models/schemas.py        # Pydantic models con validacion de patente argentina
-│   ├── routers/ (16 modulos)
+│   ├── routers/ (18 modulos)
 │   │   ├── estacionamiento.py   # /iniciar, /cobrar, /deuda
 │   │   ├── zonas.py             # CRUD zonas + ocupacion en tiempo real
 │   │   ├── auth.py              # JWT login inspectores
@@ -35,8 +35,11 @@ MuniConecta/
 │   │   ├── inspector_pwa.py     # PWA offline para inspectores
 │   │   ├── ocr.py               # Reconocimiento de patentes
 │   │   ├── admin.py             # Cierre diario + reportes
+│   │   ├── admin_crud.py        # CRUD inspectores + digest email
+│   │   ├── auditoria.py         # Registro de auditoria
+│   │   ├── vehiculos_abonos.py  # Historial vehiculos + abonos + portal ciudadano
 │   │   └── health.py            # Health check
-│   ├── services/ (14 modulos)
+│   ├── services/ (21 modulos)
 │   │   ├── pricing.py           # Calculo de tarifas unificado
 │   │   ├── schedule.py          # Ordenanza 12.170
 │   │   ├── cierre_diario.py     # Cierre masivo de sesiones
@@ -51,16 +54,24 @@ MuniConecta/
 │   │   ├── qr_generator.py      # QR para pago ciudadano
 │   │   ├── reporte_ejecutivo.py # PDF ejecutivo mensual
 │   │   ├── alert_manager.py     # Alertas multicanal
-│   │   └── predictive_analytics.py # Prediccion de demanda
+│   │   ├── predictive_analytics.py # Prediccion de demanda
+│   │   ├── abonos.py            # Gestion de abonos mensuales/semanales
+│   │   ├── auditoria.py         # Servicio de auditoria
+│   │   ├── capacity.py          # Control de capacidad por zona
+│   │   ├── email_digest.py      # Reportes periodicos por email
+│   │   ├── geofence.py          # Deteccion automatica de zona por GPS
+│   │   └── vehiculo_historial.py # Historial completo de vehiculos
 │   └── static/inspector/        # PWA (manifest.json, sw.js)
-├── supabase/migrations/         # 5 migraciones SQL versionadas
-├── tests/                       # 79 tests en 11 archivos
+├── supabase/migrations/         # 7 migraciones SQL versionadas
+├── tests/                       # Tests en 10 archivos
 ├── dashboard.py                 # Streamlit dashboard con UX premium
 ├── bot_telegram.py              # Bot Telegram con 7 comandos
+├── run_local.py                 # Orquestador local (API + Dashboard + Bot)
+├── seed_demo_data.py            # Sembrador de datos de demostracion
 ├── Dockerfile                   # Python 3.11-slim, Cloud Run
 ├── main.tf                      # Terraform IaC GCP
 ├── pyproject.toml               # Ruff + Pytest config
-└── requirements.txt             # 20 dependencias versionadas
+└── requirements.txt             # Dependencias versionadas
 ```
 
 ---
@@ -85,7 +96,7 @@ MuniConecta/
 
 ---
 
-## Caracteristicas (19 features)
+## Caracteristicas
 
 ### Nucleo
 - **Registro de estacionamiento** con validacion de patente argentina (3 formatos), GPS y zona
@@ -127,7 +138,7 @@ MuniConecta/
 
 ### DevOps
 - **API versioning**: `/v1/` prefix en todas las rutas
-- **Migraciones SQL**: 5 archivos versionados para Supabase
+- **Migraciones SQL**: 7 archivos versionados para Supabase
 - **Structured JSON logging**: timestamp, severity, trace_id, exception
 - **Rate limiting**: slowapi en todos los endpoints
 - **79 tests**: unitarios + integracion con pytest
