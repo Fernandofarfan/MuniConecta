@@ -49,13 +49,21 @@ async def verificar_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> 
     return x_api_key
 
 
-async def verificar_jwt(authorization: str = Header(None)) -> dict:
+async def verificar_jwt(authorization: str = Header(None), x_api_key: str = Header(None, alias="X-API-Key")) -> dict:
+    if API_KEY and x_api_key == API_KEY:
+        # Bypass for internal services (e.g. Dashboard)
+        return {"sub": "system", "rol": "admin"}
+
     if not JWT_SECRET:
         return {"sub": "anonymous", "rol": "public"}
+
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token JWT requerido. Usa Authorization: Bearer <token>")
+
     token = authorization.split(" ", 1)[1]
     payload = decodificar_jwt(token)
+
     if not payload:
         raise HTTPException(status_code=401, detail="Token JWT invalido o expirado")
+
     return payload

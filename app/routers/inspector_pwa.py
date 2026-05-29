@@ -92,7 +92,7 @@ async def inspector_pwa():
                     resultDiv.textContent = '¡Registrado! ' + patente;
                 } else {
                     resultDiv.className = 'status error';
-                    resultDiv.textContent = data.detail || 'Error';
+                    resultDiv.textContent = Array.isArray(data.detail) ? data.detail[0].msg : (data.detail || 'Error');
                 }
             } catch (e) {
                 resultDiv.style.display = 'block';
@@ -121,7 +121,7 @@ async def inspector_pwa():
                     resultDiv.innerHTML = 'Total: $' + data.monto_final + (data.link_pago_mp ? '<br><a href="' + data.link_pago_mp + '" style="color:#00b1ea">Pagar con MercadoPago</a>' : '');
                 } else {
                     resultDiv.className = 'status error';
-                    resultDiv.textContent = data.detail || 'Error';
+                    resultDiv.textContent = Array.isArray(data.detail) ? data.detail[0].msg : (data.detail || 'Error');
                 }
             } catch (e) {
                 resultDiv.style.display = 'block';

@@ -4,8 +4,10 @@ logger = logging.getLogger(__name__)
 
 
 async def verificar_abono_activo(patente: str, zona_id: int | None = None) -> dict | None:
-    import httpx
     from datetime import date
+
+    import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     headers = {
@@ -32,8 +34,10 @@ async def verificar_abono_activo(patente: str, zona_id: int | None = None) -> di
 
 
 async def crear_abono(patente: str, zona_id: int, tipo: str, chat_id: int | None = None) -> dict:
-    import httpx
     from datetime import date, timedelta
+
+    import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     hoy = date.today()

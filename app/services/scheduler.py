@@ -18,8 +18,9 @@ def iniciar_scheduler():
         try:
             resultado = await procesar_cierre_diario()
             logger.info(f"Cierre diario automatico: {resultado}")
-            from app.websocket_manager import manager
             import json
+
+            from app.websocket_manager import manager
             await manager.broadcast(json.dumps({"event": "cierre_diario", "resultado": resultado}))
         except Exception as e:
             logger.error(f"Error en cierre diario automatico: {e}")

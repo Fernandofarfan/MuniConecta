@@ -5,6 +5,7 @@ logger = logging.getLogger(__name__)
 
 async def registrar_auditoria(legajo: str, accion: str, entidad: str = "", entidad_id: int = 0, detalles: dict | None = None):
     import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     carga = {
@@ -30,6 +31,7 @@ async def registrar_auditoria(legajo: str, accion: str, entidad: str = "", entid
 
 async def obtener_auditoria(desde: str = "", hasta: str = "", legajo: str = "", limit: int = 100) -> list[dict]:
     import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}

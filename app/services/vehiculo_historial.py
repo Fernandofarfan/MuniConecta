@@ -5,6 +5,7 @@ logger = logging.getLogger(__name__)
 
 async def obtener_historial_vehiculo(patente: str, desde: str = "", hasta: str = "") -> dict:
     import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}

@@ -1,10 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timedelta
 
 from app.services.anomaly_detector import detectar_anomalias
 from app.services.dnrpa_lookup import consultar_dnrpa
-from app.services.tarifas_especiales import aplicar_tarifa_especial
 from app.services.predictive_analytics import predecir_demanda
+from app.services.tarifas_especiales import aplicar_tarifa_especial
 
 
 class TestDNRPA:

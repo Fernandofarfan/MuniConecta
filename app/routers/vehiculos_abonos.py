@@ -4,9 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import verificar_api_key
 from app.services.abonos import crear_abono, verificar_abono_activo
-from app.services.geofence import detectar_zona_por_gps
 from app.services.vehiculo_historial import obtener_historial_vehiculo
-from app.services.capacity import verificar_capacidad, agregar_lista_espera
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vehiculos", tags=["Vehiculos"])

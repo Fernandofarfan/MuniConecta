@@ -2,8 +2,8 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import verificar_api_key, verificar_jwt, crear_hash_password
-from app.database import ZonaDB, InspectorDB
+from app.auth import crear_hash_password, verificar_api_key, verificar_jwt
+from app.database import InspectorDB
 from app.services.email_digest import enviar_digests_automaticos
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ def _verificar_admin(jwt: dict):
 async def listar_inspectores(_: str = Depends(verificar_api_key), jwt: dict = Depends(verificar_jwt)):
     _verificar_admin(jwt)
     import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
@@ -57,6 +58,7 @@ async def actualizar_inspector(legajo: str, peticion: dict, _: str = Depends(ver
     _verificar_admin(jwt)
 
     import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     carga = {}
@@ -98,6 +100,7 @@ async def disparar_digest(frecuencia: str = "semanal", _: str = Depends(verifica
 @router.post("/digest/suscribir")
 async def suscribir_digest(peticion: dict, _: str = Depends(verificar_api_key)):
     import httpx
+
     from app.config import SUPABASE_KEY, SUPABASE_URL
 
     headers = {
