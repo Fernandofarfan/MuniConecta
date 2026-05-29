@@ -105,3 +105,90 @@ async def multas_ciudadano(patente: str):
         multas = respuesta.json()
         pendiente = sum(m["monto_multa"] for m in multas if m["estado"] == "pendiente")
         return {"patente": patente, "multas": multas, "total_pendiente": pendiente}
+
+
+@router.post("/{infraccion_id}/apelar")
+async def apelar_infraccion(
+    infraccion_id: int,
+    peticion: dict,
+):
+    import httpx
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    carga = {
+        "apelacion_texto": peticion.get("motivo", ""),
+        "apelacion_estado": "pendiente_revision",
+    }
+    async with httpx.AsyncClient() as cliente:
+        url = f"{SUPABASE_URL}/rest/v1/infracciones?id=eq.{infraccion_id}"
+        resp = await cliente.patch(url, headers=headers, json=carga)
+        if resp.status_code not in [200, 204]:
+            raise HTTPException(status_code=500, detail="Error al registrar apelacion")
+        return {"mensaje": "Apelacion registrada. Sera revisada por un supervisor."}
+
+
+@router.patch("/{infraccion_id}/resolver-apelacion")
+async def resolver_apelacion(
+    infraccion_id: int,
+    peticion: dict,
+    _: str = Depends(verificar_api_key),
+):
+    import httpx
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    carga = {
+        "apelacion_estado": peticion.get("decision", "rechazada"),
+        "apelacion_respuesta": peticion.get("respuesta", ""),
+        "apelacion_revisado_por": peticion.get("revisado_por", "supervisor"),
+    }
+    if carga["apelacion_estado"] == "aceptada":
+        carga["estado"] = "anulada"
+
+    async with httpx.AsyncClient() as cliente:
+        url = f"{SUPABASE_URL}/rest/v1/infracciones?id=eq.{infraccion_id}"
+        resp = await cliente.patch(url, headers=headers, json=carga)
+        if resp.status_code not in [200, 204]:
+            raise HTTPException(status_code=500, detail="Error al resolver apelacion")
+        return {"mensaje": f"Apelacion {carga['apelacion_estado']}"}
+
+
+@router.post("/{infraccion_id}/pagar")
+async def pagar_infraccion(infraccion_id: int):
+    import httpx
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+    }
+
+    async with httpx.AsyncClient() as cliente:
+        url = f"{SUPABASE_URL}/rest/v1/infracciones?id=eq.{infraccion_id}&select=*"
+        resp = await cliente.get(url, headers=headers)
+        if resp.status_code != 200 or not resp.json():
+            raise HTTPException(status_code=404, detail="Infraccion no encontrada")
+
+        infraccion = resp.json()[0]
+        if infraccion["estado"] == "pagada":
+            raise HTTPException(status_code=400, detail="Esta infraccion ya fue pagada")
+
+    from app.services.mercadopago import crear_preferencia_pago
+    preferencia = await crear_preferencia_pago(
+        infraccion["patente"],
+        float(infraccion["monto_multa"]),
+        "ciudadano@email.com",
+    )
+
+    return {
+        "mensaje": "Link de pago generado",
+        "init_point": preferencia["init_point"],
+        "monto": infraccion["monto_multa"],
+        "infraccion_id": infraccion_id,
+    }

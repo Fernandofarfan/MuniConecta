@@ -12,6 +12,22 @@ def _mock_schedule(return_value=True):
     return patch(f"{_ROUTER}.es_horario_cobrable", return_value=return_value)
 
 
+def _mock_geofence():
+    return patch(f"{_ROUTER}.detectar_zona_por_gps", new_callable=AsyncMock, return_value=None)
+
+
+def _mock_capacity(return_value=True):
+    return patch(f"{_ROUTER}.verificar_capacidad", new_callable=AsyncMock, return_value=(return_value, 10, 50))
+
+
+def _mock_abono(return_value=None):
+    return patch(f"{_ROUTER}.verificar_abono_activo", new_callable=AsyncMock, return_value=return_value)
+
+
+def _mock_auditoria():
+    return patch(f"{_ROUTER}.registrar_auditoria", new_callable=AsyncMock)
+
+
 class TestIniciarEstacionamiento:
     def test_tipo_vehiculo_invalido(self, cliente, headers):
         respuesta = cliente.post(
@@ -24,7 +40,8 @@ class TestIniciarEstacionamiento:
     def test_patente_vieja_formato_valido(self, cliente, headers):
         with _mock_schedule(), \
              _mock_db("buscar_activo_por_patente", return_value=None), \
-             _mock_db("crear"), \
+             _mock_geofence(), _mock_capacity(), _mock_abono(), \
+             _mock_db("crear"), _mock_auditoria(), \
              patch(f"{_ROUTER}.manager.broadcast", new_callable=AsyncMock):
             respuesta = cliente.post(
                 "/v1/estacionamiento/iniciar",
@@ -36,7 +53,8 @@ class TestIniciarEstacionamiento:
     def test_iniciar_con_gps(self, cliente, headers):
         with _mock_schedule(), \
              _mock_db("buscar_activo_por_patente", return_value=None), \
-             _mock_db("crear"), \
+             _mock_geofence(), _mock_capacity(), _mock_abono(), \
+             _mock_db("crear"), _mock_auditoria(), \
              patch(f"{_ROUTER}.manager.broadcast", new_callable=AsyncMock):
             respuesta = cliente.post(
                 "/v1/estacionamiento/iniciar",

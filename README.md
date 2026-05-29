@@ -165,24 +165,18 @@ pip install -r requirements-dev.txt  # testing + linting
 
 Ejecuta las migraciones en orden desde `supabase/migrations/` en el SQL Editor de Supabase.
 
-### 4. Ejecutar
+### 3. Ejecutar los Servicios (Entorno Local)
 
+Para simplificar el desarrollo y las pruebas, hemos creado un orquestador que levanta toda la arquitectura en paralelo.
+
+Simplemente ejecuta en tu terminal:
 ```bash
-# API
-uvicorn app.main:app --reload
-
-# Dashboard
-streamlit run dashboard.py
-
-# Bot Telegram
-python bot_telegram.py
-
-# Tests
-pytest tests/ -v
-
-# Lint
-ruff check .
+python run_local.py
 ```
+Esto iniciará automáticamente:
+1. La API y WebSockets (Puerto 8000).
+2. El Dashboard de Streamlit (Puerto 8501).
+3. El proceso en background del Bot de Telegram.
 
 ---
 

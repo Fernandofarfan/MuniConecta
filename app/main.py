@@ -88,8 +88,9 @@ app.add_middleware(SlowAPIMiddleware)
 
 # Routers
 from app.routers import (
-    admin, analiticas, auth, ciudadanos, dnrpa, estacionamiento, health,
-    infracciones, inspector_pwa, ocr, pagos, qr_portal, tarifas, zonas,
+    admin, admin_crud, analiticas, auditoria, auth, ciudadanos, dnrpa,
+    estacionamiento, health, infracciones, inspector_pwa, ocr, pagos,
+    qr_portal, tarifas, vehiculos_abonos, zonas,
 )
 from app.routers.anomalias import crear_router as crear_router_anomalias
 
@@ -103,6 +104,11 @@ app.include_router(dnrpa.router, prefix="/v1")
 app.include_router(infracciones.router, prefix="/v1")
 app.include_router(tarifas.router, prefix="/v1")
 app.include_router(admin.router, prefix="/v1")
+app.include_router(admin_crud.router, prefix="/v1")
+app.include_router(auditoria.router, prefix="/v1")
+app.include_router(vehiculos_abonos.router, prefix="/v1")
+app.include_router(vehiculos_abonos.router_abonos, prefix="/v1")
+app.include_router(vehiculos_abonos.router_ciudadano_portal, prefix="/v1")
 app.include_router(ocr.router, prefix="/v1")
 app.include_router(health.router)
 app.include_router(qr_portal.router)

@@ -43,7 +43,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/registrar AB123CD - Vincular patente a tu cuenta\n"
         "/mis_patentes - Ver tus patentes registradas\n"
         "/desregistrar AB123CD - Desvincular patente\n"
-        "/multas AB123CD - Consultar infracciones"
+        "/multas AB123CD - Consultar infracciones\n"
+        "/dnrpa AB123CD - Consultar registro automotor\n"
+        "/abono AB123CD - Comprar abono mensual\n"
+        "/historial AB123CD - Ver historial\n"
+        "/apelar ID motivo - Apelar infraccion"
     )
 
 
@@ -215,6 +219,86 @@ async def cmd_dnrpa(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Error de conexion.")
 
 
+async def cmd_historial(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Uso: /historial AB123CD")
+        return
+    patente = context.args[0].upper().strip()
+    import httpx
+    async with httpx.AsyncClient() as cliente:
+        try:
+            resp = await cliente.get(f"{API_URL}/v1/vehiculos/{patente}/historial", headers=_api_headers())
+            if resp.status_code == 200:
+                data = resp.json()
+                t = data.get("totales", {})
+                e = data.get("estadisticas", {})
+                a = data.get("abono_activo")
+                texto = (
+                    f"Historial de {patente}:\n"
+                    f"Total gastado: ${t.get('total_gastado', 0)}\n"
+                    f"Multas pendientes: ${t.get('total_pendiente_multas', 0)}\n"
+                    f"Estacionamientos: {t.get('total_estacionamientos', 0)}\n"
+                    f"Zona favorita: {e.get('zona_favorita', 'N/A')}\n"
+                    f"Duracion promedio: {e.get('duracion_promedio_min', 0)}min"
+                )
+                if a:
+                    texto += f"\n\nAbono activo hasta {a.get('fecha_fin', 'N/A')}"
+                await update.message.reply_text(texto)
+            else:
+                await update.message.reply_text("Error al consultar historial.")
+        except Exception:
+            await update.message.reply_text("Error de conexion.")
+
+
+async def cmd_abono(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Uso: /abono AB123CD")
+        return
+    patente = context.args[0].upper().strip()
+    import httpx
+    async with httpx.AsyncClient() as cliente:
+        try:
+            resp = await cliente.post(
+                f"{API_URL}/v1/abonos/crear",
+                json={"patente": patente, "zona_id": 1, "tipo": "mensual", "chat_id": update.effective_chat.id},
+                headers=_api_headers(),
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                a = data.get("abono", {})
+                await update.message.reply_text(
+                    f"Abono mensual creado para {patente}!\n"
+                    f"Valido hasta: {a.get('fecha_fin', 'N/A')}\n"
+                    f"Monto: ${a.get('monto', 0)}"
+                )
+            else:
+                await update.message.reply_text("Error al crear abono.")
+        except Exception:
+            await update.message.reply_text("Error de conexion.")
+
+
+async def cmd_apelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Uso: /apelar ID_INFRACCION motivo")
+        return
+    infraccion_id = context.args[0]
+    motivo = " ".join(context.args[1:])
+    import httpx
+    async with httpx.AsyncClient() as cliente:
+        try:
+            resp = await cliente.post(
+                f"{API_URL}/v1/infracciones/{infraccion_id}/apelar",
+                json={"motivo": motivo},
+                headers=_api_headers(),
+            )
+            if resp.status_code == 200:
+                await update.message.reply_text("Apelacion registrada. Un supervisor la revisara.")
+            else:
+                await update.message.reply_text("Error al registrar apelacion.")
+        except Exception:
+            await update.message.reply_text("Error de conexion.")
+
+
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text.strip().upper().replace(" ", "").replace("-", "")
     if _PLATE_RE.match(texto):
@@ -268,6 +352,9 @@ def main():
     app.add_handler(CommandHandler("desregistrar", cmd_desregistrar))
     app.add_handler(CommandHandler("multas", cmd_multas))
     app.add_handler(CommandHandler("dnrpa", cmd_dnrpa))
+    app.add_handler(CommandHandler("abono", cmd_abono))
+    app.add_handler(CommandHandler("historial", cmd_historial))
+    app.add_handler(CommandHandler("apelar", cmd_apelar))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
 
     logger.info("Bot de Telegram iniciado...")

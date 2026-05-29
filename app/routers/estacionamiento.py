@@ -14,6 +14,10 @@ from app.models.schemas import (
 )
 from app.services.pricing import calcular_costo
 from app.services.schedule import es_horario_cobrable
+from app.services.geofence import detectar_zona_por_gps
+from app.services.capacity import verificar_capacidad, agregar_lista_espera, notificar_lista_espera
+from app.services.abonos import verificar_abono_activo
+from app.services.auditoria import registrar_auditoria
 from app.websocket_manager import manager
 
 logger = logging.getLogger(__name__)
@@ -61,6 +65,24 @@ async def iniciar_estacionamiento(
     if registro_existente:
         raise HTTPException(status_code=400, detail="El vehiculo ya tiene un estacionamiento activo en curso")
 
+    zona_id = peticion.zona_id
+    zona_detectada = None
+    if not zona_id and peticion.lat and peticion.lon:
+        geo = await detectar_zona_por_gps(peticion.lat, peticion.lon)
+        if geo:
+            zona_id = geo["zona_id"]
+            zona_detectada = geo["zona_nombre"]
+
+    if zona_id:
+        disponible, ocupados, capacidad = await verificar_capacidad(zona_id)
+        if not disponible:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Zona llena ({ocupados}/{capacidad}). Intente en otra zona.",
+            )
+
+    abono = await verificar_abono_activo(peticion.patente, zona_id)
+
     carga_datos = {
         "patente": peticion.patente,
         "tipo_vehiculo": peticion.tipo_vehiculo,
@@ -76,9 +98,16 @@ async def iniciar_estacionamiento(
     await manager.broadcast(json.dumps({"event": "update_dashboard"}))
 
     background_tasks.add_task(_notificar_ciudadanos, peticion.patente)
+    background_tasks.add_task(registrar_auditoria, peticion.legajo_permisionario, "iniciar_estacionamiento", "estacionamiento", 0, {"patente": peticion.patente})
 
-    logger.info(f"Estacionamiento iniciado: patente={peticion.patente}, tipo={peticion.tipo_vehiculo}")
-    return {"mensaje": "Estacionamiento iniciado correctamente", "datos": carga_datos}
+    logger.info(f"Estacionamiento iniciado: patente={peticion.patente}, tipo={peticion.tipo_vehiculo}, zona={zona_id}")
+    return {
+        "mensaje": "Estacionamiento iniciado correctamente",
+        "datos": carga_datos,
+        "zona_detectada": zona_detectada,
+        "zona_id": zona_id,
+        "abono_activo": abono is not None,
+    }
 
 
 @router.post(
@@ -118,6 +147,11 @@ async def calcular_cobro(
         link_pago_mp = f"https://mpago.la/mock_punatech_2026?patente={peticion.patente}"
 
     await manager.broadcast(json.dumps({"event": "update_dashboard"}))
+    import asyncio
+    asyncio.create_task(registrar_auditoria(registro.get("legajo_permisionario", "INSP-01"), "cobrar_estacionamiento", "estacionamiento", registro.get("id", 0), {"patente": peticion.patente, "monto": costo_total}))
+    if registro.get("zona_id"):
+        asyncio.create_task(notificar_lista_espera(registro["zona_id"]))
+
     logger.info(f"Cobro calculado: patente={peticion.patente}, monto=${costo_total}")
     return {
         "mensaje": "Estacionamiento finalizado y cobro calculado",
