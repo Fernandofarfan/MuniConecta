@@ -3,7 +3,7 @@ from datetime import UTC
 
 from fastapi import Header, HTTPException
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -11,16 +11,19 @@ from app.config import API_KEY, JWT_ALGORITHM, JWT_SECRET
 
 logger = logging.getLogger(__name__)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 limiter = Limiter(key_func=get_remote_address)
 
 
 def crear_hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
 
 
 def verificar_password(password: str, hashed: str) -> bool:
-    return pwd_context.verify(password, hashed)
+    pwd_bytes = password.encode('utf-8')
+    hashed_bytes = hashed.encode('utf-8')
+    return bcrypt.checkpw(pwd_bytes, hashed_bytes)
 
 
 def crear_jwt(data: dict) -> str:

@@ -1,12 +1,11 @@
 import os
-
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from datetime import UTC, datetime, timedelta
 
-import google.generativeai as genai
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -15,7 +14,8 @@ import requests
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-st_autorefresh(interval=10000, key="data_refresh")
+# Refrescar cada 60 segundos para evitar interrumpir a Gemini
+st_autorefresh(interval=60000, key="data_refresh")
 st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide", initial_sidebar_state="expanded")
 
 # ── CSS Premium ──
@@ -332,17 +332,25 @@ with t1:
 
     st.divider()
     st.subheader("🤖 Intendente AI")
+    if "ia_report" not in st.session_state:
+        st.session_state.ia_report = None
+        
     if st.button("Generar Reporte IA", key="ia_btn"):
         if not GEMINI_API_KEY:
-            st.error("Configura GEMINI_API_KEY")
+            st.error("Configura GEMINI_API_KEY en tu variable de entorno")
         else:
-            with st.spinner("Analizando..."):
+            with st.spinner("Generando reporte con Gemini (esto puede tardar unos segundos)..."):
                 try:
                     model = genai.GenerativeModel("gemini-2.5-flash")
                     prompt = f"SEM Salta: {vehiculos_activos} activos, ${recaudacion_hoy:,.0f} recaudado, {porcentaje_digital:.0f}% digital, {pendientes_multas} multas pendientes. Reporte ejecutivo 1 parrafo para el Intendente con accion recomendada."
-                    st.info(model.generate_content(prompt).text)
+                    response = model.generate_content(prompt)
+                    st.session_state.ia_report = response.text
                 except Exception as e:
-                    st.error(str(e))
+                    st.error(f"Ocurrió un error al contactar a la IA: {e}")
+                    
+    if st.session_state.ia_report:
+        st.success("Reporte generado:")
+        st.info(st.session_state.ia_report)
 
 # ── TAB 2: Vehiculos ──
 with t2:
@@ -442,6 +450,7 @@ with t4:
                         st.error(res.get("error", "Error"))
                     else:
                         st.success("Inspector creado")
+                        st.rerun()
 
     elif admin_subtab == "Zonas":
         st.subheader("📍 Zonas")
