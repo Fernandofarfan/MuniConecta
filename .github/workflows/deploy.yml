@@ -49,4 +49,10 @@ jobs:
             --min-instances 1 \
             --max-instances 10 \
             --concurrency 80 \
-            --set-env-vars "API_URL=https://municonecta-service-728832414144.us-central1.run.app"
+            --set-env-vars "API_URL=https://municonecta-service-728832414144.us-central1.run.app" \
+            --set-secrets "SUPABASE_URL=SUPABASE_URL:latest" \
+            --set-secrets "SUPABASE_KEY=SUPABASE_KEY:latest" \
+            --set-secrets "API_KEY=API_KEY:latest" \
+            --set-secrets "JWT_SECRET=JWT_SECRET:latest" \
+            --set-secrets "TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest" \
+            --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest"

@@ -1,7 +1,10 @@
+# ============================================================
+# DEPRECATED - The active entry point is: app/main.py
+# Run with: uvicorn app.main:app --reload
+# ============================================================
 import json
 import logging
 import math
-import os
 from datetime import UTC, datetime, timedelta, timezone
 
 import httpx

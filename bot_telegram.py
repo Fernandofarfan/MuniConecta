@@ -5,13 +5,7 @@ import re
 
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 load_dotenv()
 
@@ -84,8 +78,15 @@ async def cmd_registrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await update.message.reply_text(f"La patente {patente} ya esta registrada por otro ciudadano.")
                     return
 
-            ciudadano = await CiudadanoDB.buscar_por_chat_id(chat_id)
-            patentes = ciudadano.get("patentes_registradas", []) if ciudadano else []
+            # Get existing patentes via API
+            mis_resp = await cliente.get(
+                f"{API_URL}/v1/ciudadano/resumen/{chat_id}",
+                headers=_api_headers(),
+            )
+            patentes = []
+            if mis_resp.status_code == 200:
+                for p in mis_resp.json().get("patentes", []):
+                    patentes.append(p["patente"])
             if patente not in patentes:
                 patentes.append(patente)
 

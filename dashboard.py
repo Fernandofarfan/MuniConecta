@@ -15,7 +15,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 # Refrescar cada 60 segundos para evitar interrumpir a Gemini
-st_autorefresh(interval=60000, key="data_refresh")
+st_autorefresh(interval=10000, key="data_refresh")
 st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide", initial_sidebar_state="expanded")
 
 # ── CSS Premium ──

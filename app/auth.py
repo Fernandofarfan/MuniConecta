@@ -1,9 +1,9 @@
 import logging
 from datetime import UTC
 
+import bcrypt
 from fastapi import Header, HTTPException
 from jose import JWTError, jwt
-import bcrypt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 

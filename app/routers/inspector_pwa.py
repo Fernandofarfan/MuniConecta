@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 
 router = APIRouter(tags=["PWA"])
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static", "inspector")
+API_KEY_PWA = os.getenv("API_KEY", "")
 
 
 @router.get("/inspector/")
@@ -16,7 +16,7 @@ async def inspector_pwa():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/inspector/manifest.json">
     <title>SEM Express - Inspector</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -65,9 +65,10 @@ async def inspector_pwa():
     </div>
 
     <script>
-        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/inspector/sw.js'); }
 
-        let isOnline = navigator.onLine;
+        const API_KEY = '{api_key}';
+    let isOnline = navigator.onLine;
         window.addEventListener('online', () => { isOnline = true; document.getElementById('offlineBadge').style.display = 'none'; });
         window.addEventListener('offline', () => { isOnline = false; document.getElementById('offlineBadge').style.display = 'inline-block'; });
 
@@ -82,7 +83,7 @@ async def inspector_pwa():
             try {
                 const res = await fetch('/v1/estacionamiento/iniciar', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-API-Key': ''},
+                    headers: {'Content-Type': 'application/json', 'X-API-Key': API_KEY},
                     body: JSON.stringify({patente, tipo_vehiculo: tipo, legajo_permisionario: legajo})
                 });
                 const data = await res.json();
@@ -111,7 +112,7 @@ async def inspector_pwa():
             try {
                 const res = await fetch('/v1/estacionamiento/cobrar', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-API-Key': ''},
+                    headers: {'Content-Type': 'application/json', 'X-API-Key': API_KEY},
                     body: JSON.stringify({patente, metodo_pago: metodo})
                 });
                 const data = await res.json();
@@ -132,4 +133,4 @@ async def inspector_pwa():
     </script>
 </body>
 </html>
-""")
+""".replace("{api_key}", API_KEY_PWA))
