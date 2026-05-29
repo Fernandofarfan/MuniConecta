@@ -1,21 +1,32 @@
-import logging
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.auth import limiter
-from app.routers import admin, estacionamiento, health, ocr
+from app.logging_config import setup_logging
+from app.routers import admin, analiticas, auth, ciudadanos, estacionamiento, health, ocr, pagos, zonas
 from app.websocket_manager import manager
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
+setup_logging()
 
-app = FastAPI(title="SEM Express")
+app = FastAPI(
+    title="SEM Express",
+    description="Sistema de Estacionamiento Medido - Municipalidad de Salta",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_tags=[
+        {"name": "Estacionamiento", "description": "Gestion de estacionamientos medidos"},
+        {"name": "Zonas", "description": "Zonas tarifarias de estacionamiento"},
+        {"name": "Auth", "description": "Autenticacion de inspectores"},
+        {"name": "Pagos", "description": "Integracion MercadoPago y comprobantes"},
+        {"name": "Analiticas", "description": "Estadisticas y metricas historicas"},
+        {"name": "Ciudadanos", "description": "Registro y busqueda de ciudadanos"},
+        {"name": "Admin", "description": "Administracion del sistema"},
+        {"name": "OCR", "description": "Reconocimiento de patentes"},
+        {"name": "Health", "description": "Health check"},
+    ],
+)
 
 ALLOWED_ORIGINS = [
     "http://localhost:8501",
@@ -34,17 +45,33 @@ app.add_middleware(
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
-app.include_router(estacionamiento.router)
-app.include_router(ocr.router)
-app.include_router(admin.router)
+app.include_router(estacionamiento.router, prefix="/v1")
+app.include_router(zonas.router, prefix="/v1")
+app.include_router(auth.router, prefix="/v1")
+app.include_router(pagos.router, prefix="/v1")
+app.include_router(analiticas.router, prefix="/v1")
+app.include_router(ciudadanos.router, prefix="/v1")
+app.include_router(admin.router, prefix="/v1")
+app.include_router(ocr.router, prefix="/v1")
 app.include_router(health.router)
 
 
-@app.websocket("/ws/dashboard")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+@app.get("/v1/")
+async def api_root():
+    return {
+        "api": "SEM Express",
+        "version": "1.0.0",
+        "endpoints": [
+            "POST /v1/iniciar_estacionamiento",
+            "POST /v1/calcular_cobro",
+            "POST /v1/consultar_deuda",
+            "POST /v1/escanear_patente",
+            "GET  /v1/zonas",
+            "GET  /v1/zonas/ocupacion",
+            "POST /v1/auth/login",
+            "POST /v1/pagos/crear",
+            "GET  /v1/analiticas/estadisticas",
+            "POST /v1/ciudadanos/registrar",
+            "POST /v1/cierre_diario_forzado",
+        ],
+    }
