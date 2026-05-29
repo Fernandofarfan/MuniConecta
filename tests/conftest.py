@@ -3,16 +3,15 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+os.environ.setdefault("SUPABASE_URL", "https://mock.supabase.co")
+os.environ.setdefault("SUPABASE_KEY", "mock-key")
+os.environ.setdefault("JWT_SECRET", "test-secret")
+
 
 @pytest.fixture
 def cliente():
     from app.main import app
     return TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def _setup_env():
-    os.environ.setdefault("JWT_SECRET", "test-secret")
 
 
 @pytest.fixture

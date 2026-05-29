@@ -1,0 +1,10 @@
+{
+  "name": "SEM Express Inspector",
+  "short_name": "SEM Express",
+  "description": "App de inspector de estacionamiento medido",
+  "start_url": "/inspector/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#00b1ea",
+  "icons": []
+}

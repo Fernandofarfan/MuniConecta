@@ -42,7 +42,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/deuda AB123CD - Consultar deuda\n"
         "/registrar AB123CD - Vincular patente a tu cuenta\n"
         "/mis_patentes - Ver tus patentes registradas\n"
-        "/desregistrar AB123CD - Desvincular patente"
+        "/desregistrar AB123CD - Desvincular patente\n"
+        "/multas AB123CD - Consultar infracciones"
     )
 
 
@@ -160,6 +161,60 @@ async def cmd_desregistrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Error de conexion.")
 
 
+async def cmd_multas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Uso: /multas AB123CD")
+        return
+    patente = context.args[0].upper().strip()
+    import httpx
+    async with httpx.AsyncClient() as cliente:
+        try:
+            resp = await cliente.get(f"{API_URL}/v1/infracciones/multas/{patente}", headers=_api_headers())
+            if resp.status_code == 200:
+                data = resp.json()
+                multas = data.get("multas", [])
+                total = data.get("total_pendiente", 0)
+                if not multas:
+                    await update.message.reply_text(f"La patente {patente} no tiene infracciones. Buen trabajo!")
+                else:
+                    texto = f"Infracciones para {patente}:\n\n"
+                    for m in multas[:5]:
+                        texto += f"- {m['tipo_infraccion']}: ${m['monto_multa']} ({m['estado']})\n"
+                    texto += f"\nTotal pendiente: ${total}"
+                    await update.message.reply_text(texto)
+            else:
+                await update.message.reply_text("Error al consultar infracciones.")
+        except Exception:
+            await update.message.reply_text("Error de conexion.")
+
+
+async def cmd_dnrpa(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Uso: /dnrpa AB123CD")
+        return
+    patente = context.args[0].upper().strip()
+    import httpx
+    async with httpx.AsyncClient() as cliente:
+        try:
+            resp = await cliente.get(f"{API_URL}/v1/dnrpa/{patente}", headers=_api_headers())
+            if resp.status_code == 200:
+                data = resp.json()
+                texto = (
+                    f"DNRPA - Consulta de {patente}:\n"
+                    f"Vehiculo: {data.get('marca')} {data.get('modelo')} ({data.get('anio')})\n"
+                    f"Color: {data.get('color')}\n"
+                    f"Pedido de secuestro: {'SI' if data.get('tiene_pedido_secuestro') else 'No'}\n"
+                    f"Deuda patentes: {'SI' if data.get('tiene_deuda_patentes') else 'No'}"
+                )
+                await update.message.reply_text(texto)
+            elif resp.status_code == 404:
+                await update.message.reply_text(f"No se encontraron datos para {patente}")
+            else:
+                await update.message.reply_text("Error al consultar DNRPA.")
+        except Exception:
+            await update.message.reply_text("Error de conexion.")
+
+
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text.strip().upper().replace(" ", "").replace("-", "")
     if _PLATE_RE.match(texto):
@@ -211,6 +266,8 @@ def main():
     app.add_handler(CommandHandler("registrar", cmd_registrar))
     app.add_handler(CommandHandler("mis_patentes", cmd_mis_patentes))
     app.add_handler(CommandHandler("desregistrar", cmd_desregistrar))
+    app.add_handler(CommandHandler("multas", cmd_multas))
+    app.add_handler(CommandHandler("dnrpa", cmd_dnrpa))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
 
     logger.info("Bot de Telegram iniciado...")
