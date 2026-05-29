@@ -16,40 +16,47 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 st_autorefresh(interval=10000, key="data_refresh")
+st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide", initial_sidebar_state="expanded")
 
-st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide", initial_sidebar_state="collapsed")
-
+# ── CSS Premium ──
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    div[data-testid="metric-container"] {
-        background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
-        border: 1px solid rgba(255,255,255,0.1);
-        padding: 20px 25px; border-radius: 15px;
-        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.2);
-        backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    div[data-testid="metric-container"]:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 40px 0 rgba(0,177,234,0.3);
-        border: 1px solid rgba(0,177,234,0.4);
-    }
-    h1 {
-        background: linear-gradient(45deg, #00b1ea, #85bb65, #00b1ea);
-        background-size: 200% 200%;
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        font-weight: 800 !important; text-align: center;
-        animation: gradient_anim 5s ease infinite;
-    }
-    @keyframes gradient_anim {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-    .stMarkdown p { text-align: center; font-size: 1.2rem; color: #a0aabf; }
-    .stDataFrame { border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+div[data-testid="metric-container"] {
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.1); padding: 20px 25px; border-radius: 15px;
+    box-shadow: 0 8px 32px 0 rgba(0,0,0,0.2); backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+div[data-testid="metric-container"]:hover {
+    transform: translateY(-5px); box-shadow: 0 12px 40px 0 rgba(0,177,234,0.3);
+    border: 1px solid rgba(0,177,234,0.4);
+}
+h1 {
+    background: linear-gradient(45deg, #00b1ea, #85bb65, #00b1ea); background-size: 200% 200%;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    font-weight: 800 !important; text-align: center; animation: gradient_anim 5s ease infinite;
+}
+@keyframes gradient_anim { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.stTabs [data-baseweb="tab-list"] { gap: 8px; }
+.stTabs [data-baseweb="tab"] {
+    padding: 10px 20px; border-radius: 8px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1); color: #a0aabf;
+}
+.stTabs [aria-selected="true"] { background: rgba(0,177,234,0.15); color: #00b1ea; border-color: #00b1ea; }
+.stButton > button {
+    background: linear-gradient(135deg, #00b1ea, #0091c7); color: white; border: none;
+    border-radius: 10px; padding: 10px 20px; font-weight: 600; width: 100%;
+}
+.stButton > button:hover { opacity: 0.9; }
+.alert-card {
+    padding: 12px 18px; border-radius: 10px; margin: 5px 0; font-size: 0.9rem;
+    border-left: 4px solid;
+}
+.alert-alta { background: rgba(239,68,68,0.1); border-color: #ef4444; color: #fca5a5; }
+.alert-media { background: rgba(234,179,8,0.1); border-color: #eab308; color: #fde047; }
+.alert-baja { background: rgba(34,197,94,0.1); border-color: #22c55e; color: #86efac; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,17 +65,12 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 API_KEY = os.getenv("API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 
 def obtener_headers_supabase():
-    return {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
+    return {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"}
 
 
 def _api_headers():
@@ -78,305 +80,433 @@ def _api_headers():
     return h
 
 
+def _api_get(path, params=None):
+    try:
+        r = requests.get(f"{API_URL}{path}", headers=_api_headers(), params=params, timeout=10)
+        return r.json() if r.status_code == 200 else None
+    except Exception:
+        return None
+
+
+def _api_post(path, json_data):
+    try:
+        r = requests.post(f"{API_URL}{path}", json=json_data, headers=_api_headers(), timeout=10)
+        return r.json() if r.status_code in (200, 201) else {"error": r.text, "status": r.status_code}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def cargar_datos_estacionamientos():
     if not SUPABASE_URL or not SUPABASE_KEY:
-        st.error("Credenciales de Supabase no configuradas.")
         return []
-    url = f"{SUPABASE_URL}/rest/v1/estacionamientos?select=*"
-    respuesta = requests.get(url, headers=obtener_headers_supabase())
-    if respuesta.status_code == 200:
-        return respuesta.json()
-    elif respuesta.status_code == 404:
-        st.error("Tabla 'estacionamientos' no encontrada.")
-        st.info("Ejecuta las migraciones en supabase/migrations/")
-        return None
-    else:
-        st.error(f"Error: {respuesta.status_code}")
-        return None
+    r = requests.get(f"{SUPABASE_URL}/rest/v1/estacionamientos?select=*&limit=500", headers=obtener_headers_supabase())
+    return r.json() if r.status_code == 200 else []
 
 
-def cargar_zonas():
-    try:
-        res = requests.get(f"{API_URL}/v1/zonas/ocupacion", headers=_api_headers())
-        if res.status_code == 200:
-            return res.json().get("zonas", [])
-    except Exception:
-        pass
-    return []
+def cargar_datos_infracciones():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return []
+    r = requests.get(f"{SUPABASE_URL}/rest/v1/infracciones?select=*&limit=200", headers=obtener_headers_supabase())
+    return r.json() if r.status_code == 200 else []
 
 
-def cargar_analiticas(dias=30):
-    desde = (datetime.now(UTC) - timedelta(days=dias)).strftime("%Y-%m-%d")
-    hasta = datetime.now(UTC).strftime("%Y-%m-%d")
-    try:
-        res = requests.get(
-            f"{API_URL}/v1/analiticas/estadisticas?desde={desde}&hasta={hasta}&agrupacion=dia",
-            headers=_api_headers(),
-        )
-        if res.status_code == 200:
-            return res.json()
-    except Exception:
-        pass
-    return None
+def cargar_auditoria(legajo=""):
+    params = {"limit": 100}
+    if legajo:
+        params["legajo"] = legajo
+    return _api_get("/v1/auditoria", params)
 
 
-def cargar_datos_zonas():
-    try:
-        res = requests.get(f"{API_URL}/v1/zonas", headers=_api_headers())
-        if res.status_code == 200:
-            return res.json().get("zonas", [])
-    except Exception:
-        pass
-    return []
+def cargar_inspectores():
+    return _api_get("/v1/admin/inspectores")
 
 
+# ═══════════════ SIDEBAR ═══════════════
 with st.sidebar:
-    st.header("📱 App Permisionario")
-    st.link_button("💬 Abrir Bot en Telegram", "https://t.me/MuniConecta_Bot", use_container_width=True)
+    st.title("🚗 SEM Express")
+    st.link_button("💬 Bot Telegram", "https://t.me/MuniConecta_Bot", use_container_width=True)
 
-    st.subheader("📸 Escáner OCR Inteligente")
-    if st.button("📷 Simular Lectura de Patente"):
-        with st.spinner("Analizando imagen..."):
-            try:
-                res = requests.post(
-                    f"{API_URL}/v1/escanear_patente",
-                    json={"imagen_base64": "mock_data"},
-                    headers=_api_headers(),
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    st.success(f"✅ Patente: {data['patente_detectada']} (Confianza: {data['confianza']*100}%)")
+    accion = st.selectbox("Accion Inspector", [
+        "🚘 Iniciar Estacionamiento", "💸 Cobrar Estacionamiento",
+        "🚨 Emitir Infraccion", "🔍 Consultar DNRPA",
+        "📋 Crear Abono", "📸 OCR Patente",
+    ])
+
+    if accion == "🚘 Iniciar Estacionamiento":
+        with st.form("form_iniciar"):
+            pat = st.text_input("Patente").upper()
+            tipo = st.selectbox("Tipo", ["auto", "moto"])
+            legajo = st.text_input("Legajo", "INSP-01")
+            lat = st.number_input("Latitud", value=-24.7883, format="%.4f")
+            lon = st.number_input("Longitud", value=-65.4105, format="%.4f")
+            if st.form_submit_button("✅ Iniciar") and pat:
+                res = _api_post("/v1/estacionamiento/iniciar", {"patente": pat, "tipo_vehiculo": tipo, "legajo_permisionario": legajo, "lat": lat, "lon": lon})
+                if "error" in res:
+                    st.error(res.get("error") or res.get("detail", "Error"))
                 else:
-                    st.error("Error en el reconocimiento")
-            except Exception:
-                st.error("Fallo de conexión OCR.")
+                    zona = res.get("zona_detectada", "Auto")
+                    abono = " (Abono activo)" if res.get("abono_activo") else ""
+                    st.success(f"Registrado! Zona: {zona}{abono}")
 
-    st.divider()
+    elif accion == "💸 Cobrar Estacionamiento":
+        with st.form("form_cobrar"):
+            pat = st.text_input("Patente a retirar").upper()
+            met = st.selectbox("Pago", ["efectivo", "digital"])
+            if st.form_submit_button("💳 Cobrar") and pat:
+                res = _api_post("/v1/estacionamiento/cobrar", {"patente": pat, "metodo_pago": met})
+                if "error" in res:
+                    st.error(res.get("error") or res.get("detail", "Error"))
+                else:
+                    st.success(f"Total: ${res['monto_final']}")
+                    if res.get("link_pago_mp"):
+                        st.markdown(f"[💳 Pagar]({res['link_pago_mp']})")
 
-    st.subheader("1. Entrada de Vehículo")
-    with st.form("form_iniciar"):
-        patente = st.text_input("Patente (Ej: AB123CD)").upper()
-        tipo = st.selectbox("Tipo", ["auto", "moto"])
-        legajo = st.text_input("Tu Legajo", value="INSP-01")
-        submit_iniciar = st.form_submit_button("✅ Iniciar Estacionamiento")
-        if submit_iniciar and patente:
-            with st.spinner("Registrando..."):
-                try:
-                    res = requests.post(
-                        f"{API_URL}/v1/estacionamiento/iniciar",
-                        json={"patente": patente, "tipo_vehiculo": tipo, "legajo_permisionario": legajo},
-                        headers=_api_headers(),
-                    )
-                    if res.status_code == 200:
-                        st.success("¡Vehículo registrado!")
-                    else:
-                        st.error(res.json().get("detail", "Error"))
-                except Exception:
-                    st.error("Fallo de conexión.")
-        elif submit_iniciar:
-            st.warning("Escribe una patente.")
+    elif accion == "🚨 Emitir Infraccion":
+        with st.form("form_infraccion"):
+            pat = st.text_input("Patente").upper()
+            tipo_inf = st.selectbox("Tipo", ["sin_registro", "mal_estacionado", "exceso_tiempo"])
+            obs = st.text_area("Observaciones")
+            if st.form_submit_button("🚨 Emitir") and pat:
+                res = _api_post("/v1/infracciones/emitir", {"patente": pat, "tipo_infraccion": tipo_inf, "observaciones": obs, "legajo_inspector": "INSP-01"})
+                if "error" in res:
+                    st.error(res.get("error") or res.get("detail", "Error"))
+                else:
+                    monto = res.get("infraccion", {}).get("monto_multa", 0)
+                    st.success(f"Infraccion emitida! Monto: ${monto}")
 
-    st.divider()
+    elif accion == "🔍 Consultar DNRPA":
+        pat = st.text_input("Patente a consultar").upper()
+        if st.button("🔍 Consultar") and pat:
+            res = requests.get(f"{API_URL}/v1/dnrpa/{pat}", headers=_api_headers())
+            if res.status_code == 200:
+                d = res.json()
+                st.info(f"{d.get('marca')} {d.get('modelo')} ({d.get('anio')}) - {d.get('color')}")
+                if d.get("tiene_pedido_secuestro"):
+                    st.error("🚨 PEDIDO DE SECUESTRO ACTIVO")
+                if d.get("tiene_deuda_patentes"):
+                    st.warning("Tiene deuda de patentes")
 
-    st.subheader("2. Salida y Cobro")
-    with st.form("form_cobrar"):
-        patente_cobro = st.text_input("Patente a retirar").upper()
-        metodo = st.selectbox("Método de Pago", ["digital", "efectivo"])
-        submit_cobrar = st.form_submit_button("💸 Calcular y Cobrar")
-        if submit_cobrar and patente_cobro:
-            with st.spinner("Calculando..."):
-                try:
-                    res = requests.post(
-                        f"{API_URL}/v1/estacionamiento/cobrar",
-                        json={"patente": patente_cobro, "metodo_pago": metodo},
-                        headers=_api_headers(),
-                    )
-                    if res.status_code == 200:
-                        data = res.json()
-                        st.success(f"Total a cobrar: ${data['monto_final']}")
-                        if data.get("link_pago_mp"):
-                            st.markdown(f"[💳 Abrir Link de Pago]({data['link_pago_mp']})")
-                    else:
-                        st.error(res.json().get("detail", "Auto no encontrado"))
-                except Exception:
-                    st.error("Fallo de conexión.")
-        elif submit_cobrar:
-            st.warning("Escribe la patente.")
+    elif accion == "📋 Crear Abono":
+        with st.form("form_abono"):
+            pat = st.text_input("Patente").upper()
+            tipo_ab = st.selectbox("Tipo", ["mensual", "semanal"])
+            if st.form_submit_button("📋 Crear Abono") and pat:
+                res = _api_post("/v1/abonos/crear", {"patente": pat, "tipo": tipo_ab, "zona_id": 1})
+                if "error" in res:
+                    st.error(res.get("error", "Error"))
+                else:
+                    a = res.get("abono", {})
+                    st.success(f"Abono {tipo_ab} creado hasta {a.get('fecha_fin', 'N/A')}")
+
+    elif accion == "📸 OCR Patente":
+        if st.button("📷 Escanear"):
+            res = _api_post("/v1/escanear_patente", {"imagen_base64": "mock"})
+            if "error" in res:
+                st.error("Error OCR")
+            else:
+                st.success(f"Patente: {res['patente_detectada']} ({res['confianza']*100:.0f}%)")
 
 st.title("SEM Express")
-st.markdown("Panel de Control Inteligente de Estacionamiento Medido")
+st.markdown("Panel de Control Inteligente | Municipalidad de Salta")
 
+# ── Cargar datos base ──
 datos = cargar_datos_estacionamientos()
-
-if datos is None:
-    st.stop()
-elif not datos:
-    st.info("No hay datos de estacionamientos registrados en el sistema.")
-else:
+df = None
+if datos:
     df = pd.DataFrame(datos)
-    columnas_esperadas = [
-        "estado", "monto_final", "metodo_pago", "hora_inicio", "hora_fin",
-        "patente", "legajo_permisionario", "lat", "lon", "zona_id",
-    ]
-    for col in columnas_esperadas:
+    for col in ["estado", "monto_final", "metodo_pago", "hora_inicio", "hora_fin", "patente", "legajo_permisionario", "lat", "lon", "zona_id"]:
         if col not in df.columns:
             df[col] = None
-
     df["monto_final"] = pd.to_numeric(df["monto_final"], errors="coerce").fillna(0)
     df["hora_inicio_dt"] = pd.to_datetime(df["hora_inicio"], errors="coerce")
-    df["fecha_inicio"] = df["hora_inicio_dt"].dt.date
     df["hora_fin_dt"] = pd.to_datetime(df["hora_fin"], errors="coerce")
     df["fecha_fin"] = df["hora_fin_dt"].dt.date
-    df["fecha_fin"] = df["fecha_fin"].fillna(df["fecha_inicio"])
 
-    hoy = datetime.now(UTC).date()
-    df_activos = df[df["estado"] == "activo"]
-    vehiculos_activos = len(df_activos)
+hoy = datetime.now(UTC).date()
+df_activos = df[df["estado"] == "activo"] if df is not None and not df.empty else pd.DataFrame()
+vehiculos_activos = len(df_activos)
+recaudacion_hoy = 0.0
+porcentaje_digital = 0.0
+total_pagos = 0
 
-    df_finalizados_hoy = df[(df["estado"] == "finalizado") & (df["fecha_fin"] == hoy)]
-    recaudacion_cerrada = df_finalizados_hoy["monto_final"].sum()
-    deuda_activa = df_activos["monto_final"].sum()
-    recaudacion_hoy = recaudacion_cerrada + deuda_activa
+if df is not None and not df.empty:
+    df_fin_hoy = df[(df["estado"] == "finalizado") & (df["fecha_fin"] == hoy)]
+    recaudacion_hoy = df_fin_hoy["monto_final"].sum() + df_activos["monto_final"].sum()
+    df_pagos = df[(df["estado"] == "finalizado") & (df["metodo_pago"].notna()) & (df["metodo_pago"] != "")]
+    total_pagos = len(df_pagos)
+    if total_pagos > 0:
+        porcentaje_digital = len(df_pagos[df_pagos["metodo_pago"] == "digital"]) / total_pagos * 100
 
-    df_pagos_validos = df[(df["estado"] == "finalizado") & (df["metodo_pago"].notna()) & (df["metodo_pago"] != "")]
-    total_pagos = len(df_pagos_validos)
-    pagos_digitales = len(df_pagos_validos[df_pagos_validos["metodo_pago"] == "digital"])
-    porcentaje_digital = (pagos_digitales / total_pagos * 100) if total_pagos > 0 else 0.0
+# ═══════════════ TABS ═══════════════
+t1, t2, t3, t4, t5 = st.tabs(["📊 Monitoreo", "🚗 Vehiculos", "🚨 Infracciones", "⚙️ Administracion", "📋 Auditoria"])
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("🚗 Estacionados Ahora", vehiculos_activos)
-    col2.metric("💰 Recaudación del Día", f"${recaudacion_hoy:,.2f}")
-    col3.metric("📱 Adopción Pago Digital", f"{porcentaje_digital:.1f}%")
+# ── TAB 1: Monitoreo ──
+with t1:
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("🚗 Estacionados", vehiculos_activos)
+    c2.metric("💰 Recaudacion Hoy", f"${recaudacion_hoy:,.0f}")
+    c3.metric("📱 Digital", f"{porcentaje_digital:.0f}%")
+    infracciones_data = cargar_datos_infracciones()
+    pendientes_multas = sum(1 for i in infracciones_data if i.get("estado") == "pendiente") if infracciones_data else 0
+    c4.metric("🚨 Multas Pendientes", pendientes_multas)
 
     st.divider()
+    col_mapa, col_alertas = st.columns([2, 1])
 
-    st.subheader("🗺️ Mapa de Ocupación en Tiempo Real")
-    if not df_activos.empty:
-        df_map = df_activos.copy()
-        if df_map["lat"].notna().any() and df_map["lon"].notna().any():
-            st.map(df_map[["lat", "lon"]].dropna(), zoom=14)
+    with col_mapa:
+        st.subheader("🗺️ Mapa de Ocupacion")
+        if not df_activos.empty:
+            df_map = df_activos.copy()
+            if df_map["lat"].notna().any():
+                st.map(df_map[["lat", "lon"]].dropna(), zoom=14)
+            else:
+                df_map["lat"] = -24.7883 + np.random.normal(0, 0.002, size=len(df_map))
+                df_map["lon"] = -65.4105 + np.random.normal(0, 0.002, size=len(df_map))
+                st.map(df_map[["lat", "lon"]], zoom=14)
         else:
-            df_map["lat"] = -24.7883 + np.random.normal(0, 0.002, size=len(df_map))
-            df_map["lon"] = -65.4105 + np.random.normal(0, 0.002, size=len(df_map))
-            st.map(df_map[["lat", "lon"]], zoom=14)
-    else:
-        st.info("No hay vehículos estacionados para mostrar en el mapa.")
+            st.info("Sin vehiculos activos")
+
+    with col_alertas:
+        st.subheader("🔔 Anomalias")
+        anomalias = _api_get("/v1/anomalias")
+        if anomalias and anomalias.get("anomalias"):
+            for a in anomalias["anomalias"][:6]:
+                sev = a.get("severidad", "media")
+                st.markdown(f"<div class='alert-card alert-{sev}'>{a['descripcion']}</div>", unsafe_allow_html=True)
+        else:
+            st.info("Sin anomalias detectadas")
 
     st.divider()
-
-    zonas_data = cargar_zonas()
-    if zonas_data:
-        st.subheader("📊 Ocupación por Zona")
-        cols_zona = st.columns(len(zonas_data))
-        for i, zona in enumerate(zonas_data):
-            with cols_zona[i]:
-                pct = (zona["ocupados"] / zona["capacidad_maxima"] * 100) if zona["capacidad_maxima"] > 0 else 0
-                st.metric(
-                    f"📍 {zona['nombre']}",
-                    f"{zona['ocupados']}/{zona['capacidad_maxima']}",
-                    f"{pct:.0f}% ocupado",
-                )
-
-    st.divider()
-
-    st.subheader("📈 Tendencias (30 días)")
-    analiticas = cargar_analiticas(30)
-    if analiticas and analiticas.get("serie_temporal"):
-        serie = analiticas["serie_temporal"]
-        df_serie = pd.DataFrame(serie)
-        if not df_serie.empty:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=df_serie["periodo"], y=df_serie["recaudacion"],
-                mode="lines+markers", name="Recaudación",
-                line={"color": "#00b1ea"}, fill="tozeroy",
-                fillcolor="rgba(0,177,234,0.1)",
-            ))
-            fig.update_layout(
-                margin={"t": 20, "b": 20, "l": 20, "r": 20},
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font={"color": "white"},
-                xaxis={"title": None},
-                yaxis={"title": "Recaudación ($)", "gridcolor": "rgba(255,255,255,0.1)"},
-                height=300,
+    zonas_ocup = _api_get("/v1/zonas/ocupacion") or {}
+    zonas_list = zonas_ocup.get("zonas", [])
+    if zonas_list:
+        st.subheader("📊 Ocupacion por Zona")
+        cols_z = st.columns(len(zonas_list))
+        for i, z in enumerate(zonas_list):
+            cap = z.get("capacidad_maxima", 1) or 1
+            pct = z.get("ocupados", 0) / cap * 100
+            color = "#ef4444" if pct > 80 else "#eab308" if pct > 50 else "#22c55e"
+            cols_z[i].metric(
+                f"📍 {z['nombre']}", f"{z.get('ocupados', 0)}/{cap}",
+                f"{pct:.0f}%", delta_color="off",
             )
-            st.plotly_chart(fig, use_container_width=True)
-
-            col_a, col_b, col_c = st.columns(3)
-            col_a.metric("Total Estacionamientos", analiticas["total_estacionamientos"])
-            col_b.metric("Recaudación Total", f"${analiticas['recaudacion_total']:,.2f}")
-            col_c.metric("Duración Promedio", f"{analiticas['duracion_promedio_minutos']:.0f} min")
 
     st.divider()
+    analiticas = _api_get("/v1/analiticas/estadisticas", {"desde": (datetime.now(UTC) - timedelta(30)).strftime("%Y-%m-%d"), "hasta": datetime.now(UTC).strftime("%Y-%m-%d"), "agrupacion": "dia"})
+    if analiticas and analiticas.get("serie_temporal"):
+        st.subheader("📈 Tendencias 30 dias")
+        df_s = pd.DataFrame(analiticas["serie_temporal"])
+        if not df_s.empty:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df_s["periodo"], y=df_s["recaudacion"], mode="lines+markers", name="Recaudacion", line={"color": "#00b1ea"}, fill="tozeroy", fillcolor="rgba(0,177,234,0.1)"))
+            fig.update_layout(margin={"t": 20, "b": 20, "l": 20, "r": 20}, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={"color": "white"}, height=300)
+            st.plotly_chart(fig, use_container_width=True)
+            ca, cb, cc = st.columns(3)
+            ca.metric("Total Estacionamientos", analiticas["total_estacionamientos"])
+            cb.metric("Recaudacion Total", f"${analiticas['recaudacion_total']:,.0f}")
+            cc.metric("Duracion Promedio", f"{analiticas['duracion_promedio_minutos']:.0f} min")
 
-    st.subheader("🤖 Intendente AI - Análisis Ejecutivo")
-    if st.button("Generar Reporte Estratégico con IA"):
-        if not GEMINI_API_KEY:
-            st.error("⚠️ Falta configurar GEMINI_API_KEY en el archivo .env")
+    st.divider()
+    col_pie, col_radar = st.columns(2)
+    with col_pie:
+        st.subheader("📊 Metodos de Pago")
+        if df is not None and total_pagos > 0:
+            df_p = df[(df["estado"] == "finalizado") & (df["metodo_pago"].notna()) & (df["metodo_pago"] != "")]
+            conteo = df_p["metodo_pago"].value_counts().reset_index()
+            conteo.columns = ["Metodo", "Cantidad"]
+            fig = px.pie(conteo, values="Cantidad", names="Metodo", hole=0.5, color_discrete_sequence=["#00b1ea", "#85bb65"])
+            fig.update_layout(margin={"t": 20, "b": 20}, paper_bgcolor="rgba(0,0,0,0)", font={"color": "white"})
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            with st.spinner("Analizando métricas..."):
+            st.info("Sin datos")
+
+    with col_radar:
+        st.subheader("📡 Radar Activo")
+        if not df_activos.empty:
+            tabla = df_activos[["patente", "hora_inicio", "legajo_permisionario"]].copy()
+            tabla["hora_inicio"] = pd.to_datetime(tabla["hora_inicio"]).dt.strftime("%H:%M")
+            tabla.columns = ["Patente", "Entrada", "Permisionario"]
+            st.dataframe(tabla, use_container_width=True, hide_index=True, height=350)
+        else:
+            st.info("Sin vehiculos activos")
+
+    st.divider()
+    st.subheader("🤖 Intendente AI")
+    if st.button("Generar Reporte IA", key="ia_btn"):
+        if not GEMINI_API_KEY:
+            st.error("Configura GEMINI_API_KEY")
+        else:
+            with st.spinner("Analizando..."):
                 try:
                     model = genai.GenerativeModel("gemini-2.5-flash")
-                    prompt = (
-                        f"Actua como analista de datos del SEM de la Municipalidad de Salta. "
-                        f"Hay {vehiculos_activos} autos estacionados, recaudacion ${recaudacion_hoy:,.2f}, "
-                        f"{porcentaje_digital:.1f}% pago digital. "
-                        f"Redacta un reporte ejecutivo corto (1 parrafo) para el Intendente, "
-                        f"sugiriendo una accion operativa en la calle basandote en estos datos."
-                    )
-                    respuesta = model.generate_content(prompt)
-                    st.info(respuesta.text)
+                    prompt = f"SEM Salta: {vehiculos_activos} activos, ${recaudacion_hoy:,.0f} recaudado, {porcentaje_digital:.0f}% digital, {pendientes_multas} multas pendientes. Reporte ejecutivo 1 parrafo para el Intendente con accion recomendada."
+                    st.info(model.generate_content(prompt).text)
                 except Exception as e:
-                    st.error(f"Error al generar el reporte: {e}")
+                    st.error(str(e))
+
+# ── TAB 2: Vehiculos ──
+with t2:
+    st.subheader("🔍 Busqueda de Vehiculo")
+    patente_buscar = st.text_input("Patente", key="v_pat").upper()
+    if st.button("🔍 Buscar Historial") and patente_buscar:
+        hist = _api_get(f"/v1/vehiculos/{patente_buscar}/historial")
+        if hist:
+            t = hist.get("totales", {})
+            e = hist.get("estadisticas", {})
+            a = hist.get("abono_activo")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total Gastado", f"${t.get('total_gastado', 0):,.0f}")
+            c2.metric("Estacionamientos", t.get("total_estacionamientos", 0))
+            c3.metric("Multas Pendientes", f"${t.get('total_pendiente_multas', 0):,.0f}")
+
+            c4, c5, c6 = st.columns(3)
+            c4.metric("Zona Favorita", str(e.get("zona_favorita", "N/A")))
+            c5.metric("Duracion Prom.", f"{e.get('duracion_promedio_min', 0):.0f}min")
+            c6.metric("Metodo Preferido", str(e.get("metodo_pago_favorito", "N/A")))
+
+            if a:
+                st.success(f"Abono activo hasta {a.get('fecha_fin', 'N/A')}")
+
+            if hist.get("estacionamientos"):
+                st.subheader("Estacionamientos")
+                df_hist = pd.DataFrame(hist["estacionamientos"])[["hora_inicio", "hora_fin", "monto_final", "estado", "metodo_pago", "zona_id"]]
+                st.dataframe(df_hist, use_container_width=True, hide_index=True)
+
+            if hist.get("infracciones"):
+                st.subheader("Infracciones")
+                df_inf = pd.DataFrame(hist["infracciones"])[["tipo_infraccion", "monto_multa", "estado", "creado_en"]]
+                st.dataframe(df_inf, use_container_width=True, hide_index=True)
+        else:
+            st.warning("Vehiculo no encontrado o sin datos")
 
     st.divider()
-
-    st.subheader("⚙️ Administración del Sistema")
-    col_admin1, col_admin2 = st.columns(2)
-    with col_admin1:
-        if st.button("⚠️ Ejecutar Cierre Diario Forzado", use_container_width=True):
-            with st.spinner("Cerrando sesiones activas..."):
-                try:
-                    res = requests.post(f"{API_URL}/v1/cierre_diario_forzado", headers=_api_headers())
-                    if res.status_code == 200:
-                        st.success("Cierre ejecutado")
-                        st.rerun()
-                    else:
-                        st.error("Error al ejecutar cierre")
-                except Exception:
-                    st.error("Error de conexión.")
-
-    st.divider()
-
-    col_grafico, col_tabla = st.columns(2, gap="large")
-    with col_grafico:
-        st.subheader("📊 Métodos de Pago")
-        if total_pagos > 0:
-            conteo_pagos = df_pagos_validos["metodo_pago"].value_counts().reset_index()
-            conteo_pagos.columns = ["Método de Pago", "Cantidad"]
-            conteo_pagos["Método de Pago"] = conteo_pagos["Método de Pago"].replace(
-                {"digital": "Mercado Pago", "efectivo": "Efectivo"}
-            )
-            fig = px.pie(
-                conteo_pagos, values="Cantidad", names="Método de Pago",
-                hole=0.5, color_discrete_sequence=["#00b1ea", "#85bb65"],
-            )
-            fig.update_layout(
-                margin={"t": 20, "b": 20, "l": 20, "r": 20},
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                font={"color": "white"},
-            )
+    st.subheader("📋 Prediccion de Demanda")
+    pred = _api_get("/v1/anomalias/prediccion-demanda")
+    if pred and pred.get("predicciones"):
+        df_pred = pd.DataFrame(pred["predicciones"])
+        if not df_pred.empty:
+            fig = px.density_heatmap(df_pred, x="hora", y="zona_id", z="demanda_promedio", color_continuous_scale="Blues", title="Demanda por Hora y Zona")
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "white"}, height=350)
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Sin datos suficientes.")
 
-    with col_tabla:
-        st.subheader("📡 Radar en Tiempo Real")
-        if not df_activos.empty:
-            tabla_mostrar = df_activos[["patente", "hora_inicio", "legajo_permisionario"]].copy()
-            tabla_mostrar["hora_inicio"] = pd.to_datetime(tabla_mostrar["hora_inicio"]).dt.strftime("%H:%M:%S")
-            tabla_mostrar.columns = ["Patente", "Hora Entrada", "Permisionario"]
-            st.dataframe(tabla_mostrar, use_container_width=True, hide_index=True, height=400)
+# ── TAB 3: Infracciones ──
+with t3:
+    infracciones = cargar_datos_infracciones()
+    if infracciones:
+        st.subheader(f"🚨 Infracciones ({len(infracciones)})")
+        df_inf = pd.DataFrame(infracciones)
+        cols_show = ["patente", "tipo_infraccion", "monto_multa", "estado", "creado_en"]
+        df_inf_show = df_inf[[c for c in cols_show if c in df_inf.columns]]
+        st.dataframe(df_inf_show, use_container_width=True, hide_index=True)
+
+        apelaciones = [i for i in infracciones if i.get("apelacion_estado") == "pendiente_revision"]
+        if apelaciones:
+            st.subheader(f"📝 Apelaciones Pendientes ({len(apelaciones)})")
+            for a in apelaciones:
+                with st.expander(f"{a['patente']} - {a.get('tipo_infraccion')} - ${a.get('monto_multa', 0)}"):
+                    st.text(a.get("apelacion_texto", "Sin texto"))
+                    c1, c2 = st.columns(2)
+                    if c1.button("✅ Aceptar", key=f"acc_{a['id']}"):
+                        _api_post(f"/v1/infracciones/{a['id']}/resolver-apelacion", {"decision": "aceptada", "respuesta": "Apelacion aceptada"})
+                        st.rerun()
+                    if c2.button("❌ Rechazar", key=f"rej_{a['id']}"):
+                        _api_post(f"/v1/infracciones/{a['id']}/resolver-apelacion", {"decision": "rechazada", "respuesta": "Apelacion rechazada"})
+                        st.rerun()
+
+        total_pend = sum(i["monto_multa"] for i in infracciones if i.get("estado") == "pendiente")
+        st.metric("Total Pendiente Cobro", f"${total_pend:,.0f}")
+    else:
+        st.info("Sin infracciones registradas")
+
+# ── TAB 4: Administracion ──
+with t4:
+    admin_subtab = st.selectbox("Seccion", ["Inspectores", "Zonas", "Tarifas", "Cierre Diario", "Digest Email"])
+
+    if admin_subtab == "Inspectores":
+        st.subheader("👮 Inspectores")
+        inspectores = cargar_inspectores()
+        if inspectores and inspectores.get("inspectores"):
+            df_ins = pd.DataFrame(inspectores["inspectores"])
+            cols = ["legajo", "nombre", "rol", "activo"]
+            st.dataframe(df_ins[[c for c in cols if c in df_ins.columns]], use_container_width=True, hide_index=True)
+
+        with st.expander("➕ Crear Inspector"):
+            with st.form("form_crear_ins"):
+                leg = st.text_input("Legajo")
+                nom = st.text_input("Nombre")
+                pw = st.text_input("Password", type="password")
+                rol = st.selectbox("Rol", ["inspector", "supervisor", "admin"])
+                if st.form_submit_button("Crear"):
+                    res = _api_post("/v1/admin/inspectores", {"legajo": leg, "nombre": nom, "password": pw, "rol": rol})
+                    if "error" in res:
+                        st.error(res.get("error", "Error"))
+                    else:
+                        st.success("Inspector creado")
+
+    elif admin_subtab == "Zonas":
+        st.subheader("📍 Zonas")
+        zonas = _api_get("/v1/zonas")
+        if zonas and zonas.get("zonas"):
+            df_z = pd.DataFrame(zonas["zonas"])
+            st.dataframe(df_z, use_container_width=True, hide_index=True)
+
+    elif admin_subtab == "Tarifas":
+        st.subheader("💲 Tarifas Especiales")
+        tarifas = _api_get("/v1/tarifas/activas")
+        if tarifas and tarifas.get("tarifas"):
+            st.dataframe(pd.DataFrame(tarifas["tarifas"]), use_container_width=True, hide_index=True)
         else:
-            st.info("Plazas de estacionamiento liberadas.")
+            st.info("Sin tarifas especiales activas")
+
+        with st.expander("➕ Nueva Tarifa"):
+            with st.form("form_tarifa"):
+                ev = st.text_input("Nombre Evento")
+                desde = st.date_input("Desde")
+                hasta = st.date_input("Hasta")
+                mult = st.number_input("Multiplicador", 1.0, 5.0, 1.5, 0.1)
+                if st.form_submit_button("Crear"):
+                    res = _api_post("/v1/tarifas/especiales", {"nombre_evento": ev, "fecha_inicio": str(desde), "fecha_fin": str(hasta), "multiplicador": mult})
+                    if "error" in res:
+                        st.error("Error al crear")
+                    else:
+                        st.success("Tarifa creada")
+
+    elif admin_subtab == "Cierre Diario":
+        st.subheader("⚙️ Cierre Diario")
+        if st.button("⚠️ Ejecutar Cierre Diario Forzado"):
+            res = _api_post("/v1/cierre_diario_forzado", {})
+            if "error" in res:
+                st.error("Error")
+            else:
+                st.success("Cierre ejecutado")
+                st.rerun()
+
+    elif admin_subtab == "Digest Email":
+        st.subheader("📧 Reportes por Email")
+        with st.form("form_digest"):
+            email = st.text_input("Email")
+            nombre = st.text_input("Nombre")
+            frec = st.selectbox("Frecuencia", ["semanal", "mensual"])
+            if st.form_submit_button("Suscribir"):
+                res = _api_post("/v1/admin/digest/suscribir", {"email": email, "nombre": nombre, "frecuencia": frec})
+                if "error" in res:
+                    st.error(res.get("error", "Error"))
+                else:
+                    st.success("Suscripto!")
+
+# ── TAB 5: Auditoria ──
+with t5:
+    st.subheader("📋 Registro de Actividad")
+    col_f1, col_f2 = st.columns(2)
+    legajo_filtro = col_f1.text_input("Filtrar por Legajo")
+    if col_f2.button("🔍 Buscar"):
+        pass
+
+    aud = cargar_auditoria(legajo_filtro)
+    if aud and aud.get("registros"):
+        df_aud = pd.DataFrame(aud["registros"])
+        cols = ["legajo_inspector", "accion", "entidad", "creado_en"]
+        st.dataframe(df_aud[[c for c in cols if c in df_aud.columns]], use_container_width=True, hide_index=True, height=400)
+        st.metric("Total Acciones Registradas", len(aud["registros"]))
+    else:
+        st.info("Sin registros de auditoria")
