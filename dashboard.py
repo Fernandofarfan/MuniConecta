@@ -103,8 +103,17 @@ def _api_get(path, params=None):
 
 def _api_post(path, json_data):
     try:
-        r = requests.post(f"{API_URL}{path}", json=json_data, headers=_api_headers(), timeout=10)
-        return r.json() if r.status_code in (200, 201) else {"error": r.text, "status": r.status_code}
+        url = f"{API_URL}{path}"
+        r = requests.post(url, json=json_data, headers=_api_headers(), timeout=10)
+        if r.status_code in (200, 201):
+            return r.json()
+        try:
+            detail = r.json().get("detail", r.text[:200])
+        except Exception:
+            detail = r.text[:200]
+        return {"error": detail, "status": r.status_code, "url": url}
+    except requests.exceptions.ConnectionError:
+        return {"error": f"No se pudo conectar a la API en {API_URL}. Verifica que uvicorn este corriendo (uvicorn app.main:app --port 8000)"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -140,6 +149,15 @@ def cargar_inspectores():
 # ═══════════════ SIDEBAR ═══════════════
 with st.sidebar:
     st.title("🚗 SEM Express")
+
+    api_status = _api_get("/health")
+    if api_status and api_status.get("status") == "ok":
+        st.success("API conectada")
+    else:
+        st.error(f"API no detectada en {API_URL}")
+        st.info("Ejecuta: uvicorn app.main:app --port 8000")
+        st.code("API_URL=http://127.0.0.1:8000", language="env")
+
     st.link_button("💬 Bot Telegram", "https://t.me/MuniConecta_Bot", use_container_width=True)
 
     accion = st.selectbox("Accion Inspector", [
