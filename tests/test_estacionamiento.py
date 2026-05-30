@@ -28,6 +28,14 @@ def _mock_auditoria():
     return patch(f"{_ROUTER}.registrar_auditoria", new_callable=AsyncMock)
 
 
+def _mock_saldo(return_value=0):
+    return patch(f"{_ROUTER}.VehiculoSaldoDB.obtener_saldo", new_callable=AsyncMock, return_value=return_value)
+
+
+def _mock_consumir_saldo(return_value=0):
+    return patch(f"{_ROUTER}.VehiculoSaldoDB.consumir_saldo", new_callable=AsyncMock, return_value=return_value)
+
+
 class TestIniciarEstacionamiento:
     def test_tipo_vehiculo_invalido(self, cliente, headers):
         respuesta = cliente.post(
@@ -41,6 +49,7 @@ class TestIniciarEstacionamiento:
         with _mock_schedule(), \
              _mock_db("buscar_activo_por_patente", return_value=None), \
              _mock_geofence(), _mock_capacity(), _mock_abono(), \
+             _mock_saldo(), _mock_consumir_saldo(), \
              _mock_db("crear"), _mock_auditoria(), \
              patch(f"{_ROUTER}.manager.broadcast", new_callable=AsyncMock):
             respuesta = cliente.post(
@@ -54,6 +63,7 @@ class TestIniciarEstacionamiento:
         with _mock_schedule(), \
              _mock_db("buscar_activo_por_patente", return_value=None), \
              _mock_geofence(), _mock_capacity(), _mock_abono(), \
+             _mock_saldo(), _mock_consumir_saldo(), \
              _mock_db("crear"), _mock_auditoria(), \
              patch(f"{_ROUTER}.manager.broadcast", new_callable=AsyncMock):
             respuesta = cliente.post(

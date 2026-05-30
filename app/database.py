@@ -205,3 +205,95 @@ class CiudadanoDB:
                 respuesta = await cliente.post(CiudadanoDB.URL, headers=headers, json=carga)
             if respuesta.status_code not in [200, 201, 204]:
                 raise HTTPException(status_code=500, detail=f"Error al guardar ciudadano: {respuesta.text}")
+
+
+class VehiculoSaldoDB:
+    TABLE = "vehiculos_saldos"
+    URL = f"{BASE_URL}/{TABLE}"
+
+    @staticmethod
+    async def obtener_saldo(patente: str) -> int:
+        headers = get_headers()
+        url = f"{VehiculoSaldoDB.URL}?patente=eq.{patente}&select=minutos_disponibles"
+        async with httpx.AsyncClient() as cliente:
+            respuesta = await cliente.get(url, headers=headers)
+            if respuesta.status_code == 200:
+                data = respuesta.json()
+                return data[0]["minutos_disponibles"] if data else 0
+            return 0
+
+    @staticmethod
+    async def consumir_saldo(patente: str, minutos_a_consumir: int) -> int:
+        headers = get_headers()
+        saldo_actual = await VehiculoSaldoDB.obtener_saldo(patente)
+        consumidos = min(saldo_actual, minutos_a_consumir)
+        nuevo_saldo = saldo_actual - consumidos
+
+        headers["Prefer"] = "return=minimal"
+        async with httpx.AsyncClient() as cliente:
+            url = f"{VehiculoSaldoDB.URL}?patente=eq.{patente}"
+            existing = await cliente.get(url, headers={k: v for k, v in headers.items() if k != "Prefer"})
+            if existing.status_code == 200 and existing.json():
+                await cliente.patch(url, headers=headers, json={"minutos_disponibles": nuevo_saldo})
+            else:
+                await cliente.post(VehiculoSaldoDB.URL, headers=headers, json={"patente": patente, "minutos_disponibles": nuevo_saldo})
+
+        return consumidos
+
+    @staticmethod
+    async def acreditar_saldo(patente: str, minutos: int) -> None:
+        headers = get_headers()
+        saldo_actual = await VehiculoSaldoDB.obtener_saldo(patente)
+        nuevo_saldo = saldo_actual + minutos
+
+        headers["Prefer"] = "return=minimal"
+        async with httpx.AsyncClient() as cliente:
+            url = f"{VehiculoSaldoDB.URL}?patente=eq.{patente}"
+            existing = await cliente.get(url, headers={k: v for k, v in headers.items() if k != "Prefer"})
+            if existing.status_code == 200 and existing.json():
+                await cliente.patch(url, headers=headers, json={"minutos_disponibles": nuevo_saldo})
+            else:
+                await cliente.post(VehiculoSaldoDB.URL, headers=headers, json={"patente": patente, "minutos_disponibles": nuevo_saldo})
+
+
+class InspectorFinanzasDB:
+    TABLE = "inspectores"
+    URL = f"{BASE_URL}/{TABLE}"
+
+    @staticmethod
+    async def sumar_saldo_adeudado(legajo: str, monto: float) -> None:
+        headers = get_headers()
+        headers["Prefer"] = "return=minimal"
+
+        inspector = await InspectorDB.buscar_por_legajo(legajo)
+        if not inspector:
+            return
+
+        saldo_actual = float(inspector.get("saldo_adeudado", 0) or 0)
+        nuevo_saldo = round(saldo_actual + monto, 2)
+
+        url = f"{InspectorFinanzasDB.URL}?legajo=eq.{legajo}"
+        async with httpx.AsyncClient() as cliente:
+            await cliente.patch(url, headers=headers, json={"saldo_adeudado": nuevo_saldo})
+
+    @staticmethod
+    async def rendir(legajo: str, monto: float) -> dict:
+        headers = get_headers()
+        inspector = await InspectorDB.buscar_por_legajo(legajo)
+        if not inspector:
+            raise HTTPException(status_code=404, detail="Inspector no encontrado")
+
+        saldo_actual = float(inspector.get("saldo_adeudado", 0) or 0)
+        if monto > saldo_actual:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El monto a rendir (${monto:.2f}) supera el saldo adeudado (${saldo_actual:.2f})",
+            )
+
+        nuevo_saldo = round(saldo_actual - monto, 2)
+        headers["Prefer"] = "return=representation"
+        url = f"{InspectorFinanzasDB.URL}?legajo=eq.{legajo}"
+        async with httpx.AsyncClient() as cliente:
+            await cliente.patch(url, headers=headers, json={"saldo_adeudado": nuevo_saldo})
+
+        return {"legajo": legajo, "saldo_anterior": saldo_actual, "rendido": monto, "saldo_actual": nuevo_saldo}

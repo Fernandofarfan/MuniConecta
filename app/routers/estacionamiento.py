@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.auth import verificar_api_key
 from app.config import TZ_ARG
-from app.database import CiudadanoDB, EstacionamientoDB
+from app.database import CiudadanoDB, EstacionamientoDB, InspectorFinanzasDB, VehiculoSaldoDB
 from app.models.schemas import (
     PeticionCalcularCobro,
     PeticionConsultaDeuda,
@@ -83,6 +83,12 @@ async def iniciar_estacionamiento(
 
     abono = await verificar_abono_activo(peticion.patente, zona_id)
 
+    minutos_saldo_consumidos = 0
+    if not abono:
+        minutos_saldo = await VehiculoSaldoDB.obtener_saldo(peticion.patente)
+        if minutos_saldo > 0:
+            minutos_saldo_consumidos = await VehiculoSaldoDB.consumir_saldo(peticion.patente, 60)
+
     carga_datos = {
         "patente": peticion.patente,
         "tipo_vehiculo": peticion.tipo_vehiculo,
@@ -107,6 +113,7 @@ async def iniciar_estacionamiento(
         "zona_detectada": zona_detectada,
         "zona_id": zona_id,
         "abono_activo": abono is not None,
+        "minutos_saldo_consumidos": minutos_saldo_consumidos,
     }
 
 
@@ -146,6 +153,37 @@ async def calcular_cobro(
     if peticion.metodo_pago == "digital":
         link_pago_mp = f"https://mpago.la/mock_punatech_2026?patente={peticion.patente}"
 
+    # Rendicion de efectivo: el municipio cobra 20% de cada ticket en efectivo
+    if peticion.metodo_pago == "efectivo" and costo_total > 0:
+        legajo = registro.get("legajo_permisionario", "INSP-01")
+        comision_municipal = round(costo_total * 0.20, 2)
+        import asyncio
+        asyncio.create_task(InspectorFinanzasDB.sumar_saldo_adeudado(legajo, comision_municipal))
+
+    # Saldo de tiempo a favor: calcular minutos no consumidos
+    try:
+        from datetime import datetime as dt
+        hora_inicio_dt = dt.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
+        delta_real = hora_fin - hora_inicio_dt
+        minutos_reales = delta_real.total_seconds() / 60.0
+
+        # Calcular minutos pagados (lo que el costo cubre)
+        from app.config import get_tarifa
+        tarifa_base = get_tarifa(tipo_vehiculo)
+        minutos_pagados = 60.0
+        if costo_total > tarifa_base:
+            costo_excedente = costo_total - tarifa_base
+            fracciones_pagadas = costo_excedente / (tarifa_base / 4)
+            minutos_pagados = 60.0 + fracciones_pagadas * 15.0
+        elif costo_total == 0:
+            minutos_pagados = 0
+
+        minutos_sobrantes = max(0, int(minutos_pagados - minutos_reales))
+        if minutos_sobrantes > 0 and peticion.metodo_pago == "efectivo":
+            asyncio.create_task(VehiculoSaldoDB.acreditar_saldo(peticion.patente, minutos_sobrantes))
+    except Exception:
+        minutos_sobrantes = 0  # noqa
+
     await manager.broadcast(json.dumps({"event": "update_dashboard"}))
     import asyncio
     asyncio.create_task(registrar_auditoria(registro.get("legajo_permisionario", "INSP-01"), "cobrar_estacionamiento", "estacionamiento", registro.get("id", 0), {"patente": peticion.patente, "monto": costo_total}))
@@ -160,6 +198,7 @@ async def calcular_cobro(
         "monto_final": costo_total,
         "metodo_pago": peticion.metodo_pago,
         "link_pago_mp": link_pago_mp,
+        "minutos_sobrantes_acreditados": minutos_sobrantes if 'minutos_sobrantes' in dir() else 0,
     }
 
 
@@ -193,4 +232,58 @@ async def consultar_deuda(
         "monto_total": costo_total,
         "monto_con_descuento_digital": costo_digital,
         "link_pago_mp": link_pago_mp,
+    }
+
+
+@router.post("/ciudadano/iniciar", tags=["Estacionamiento"])
+async def ciudadano_inicia_estacionamiento(peticion: dict):
+    patente = peticion.get("patente", "").upper().strip()
+    if not patente:
+        raise HTTPException(status_code=422, detail="Patente requerida")
+
+    try:
+        from app.models.schemas import validar_patente_argentina
+        patente = validar_patente_argentina(patente)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Formato de patente invalido")
+
+    zona_id = peticion.get("zona_id")
+    ahora = datetime.now(TZ_ARG)
+
+    registro_existente = await EstacionamientoDB.buscar_activo_por_patente(patente)
+    if registro_existente:
+        raise HTTPException(status_code=400, detail="El vehiculo ya tiene un estacionamiento activo en curso")
+
+    if zona_id:
+        disponible, ocupados, capacidad = await verificar_capacidad(zona_id)
+        if not disponible:
+            raise HTTPException(status_code=409, detail=f"Zona llena ({ocupados}/{capacidad})")
+
+    abono = await verificar_abono_activo(patente, zona_id)
+
+    minutos_saldo_consumidos = 0
+    if not abono:
+        minutos_saldo = await VehiculoSaldoDB.obtener_saldo(patente)
+        if minutos_saldo > 0:
+            minutos_saldo_consumidos = await VehiculoSaldoDB.consumir_saldo(patente, 60)
+
+    carga_datos = {
+        "patente": patente,
+        "tipo_vehiculo": "auto",
+        "legajo_permisionario": "CIUDADANO",
+        "hora_inicio": ahora.isoformat(),
+        "estado": "activo",
+        "zona_id": zona_id,
+    }
+
+    await EstacionamientoDB.crear(carga_datos)
+    await manager.broadcast(json.dumps({"event": "update_dashboard"}))
+
+    logger.info(f"Ciudadano inicio estacionamiento: patente={patente}, zona={zona_id}")
+    return {
+        "mensaje": "Estacionamiento iniciado por el ciudadano. Un permisionario verificara visualmente.",
+        "datos": carga_datos,
+        "zona_id": zona_id,
+        "abono_activo": abono is not None,
+        "minutos_saldo_consumidos": minutos_saldo_consumidos,
     }

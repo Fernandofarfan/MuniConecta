@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import crear_hash_password, verificar_api_key, verificar_jwt
-from app.database import InspectorDB
+from app.database import InspectorDB, InspectorFinanzasDB
 from app.services.email_digest import enviar_digests_automaticos
 
 logger = logging.getLogger(__name__)
@@ -124,3 +124,18 @@ async def suscribir_digest(peticion: dict, _: str = Depends(verificar_api_key)):
             status = 409 if resp.status_code == 409 else 500
             raise HTTPException(status_code=status, detail=detail)
         return {"mensaje": "Suscripto al digest"}
+
+
+@router.post("/rendicion/{legajo}")
+async def rendicion_efectivo(legajo: str, peticion: dict, _: str = Depends(verificar_api_key)):
+    monto = peticion.get("monto", 0)
+    if monto <= 0:
+        raise HTTPException(status_code=422, detail="El monto a rendir debe ser mayor a 0")
+
+    try:
+        resultado = await InspectorFinanzasDB.rendir(legajo, float(monto))
+        return {"mensaje": f"Rendicion registrada. Nuevo saldo: ${resultado['saldo_actual']:.2f}", **resultado}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar rendicion: {e}")
