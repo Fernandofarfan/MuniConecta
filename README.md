@@ -84,7 +84,7 @@ MuniConecta/
 | **Auth** | API Key + JWT (python-jose, passlib/bcrypt) |
 | **DB** | Supabase PostgreSQL via httpx REST API |
 | **Dashboard** | Streamlit, Pandas, Plotly, NumPy |
-| **IA** | Google Gemini 2.5 Flash (reportes ejecutivos) |
+| **IA** | Google Gemini 2.0 Flash (reportes ejecutivos) |
 | **Pagos** | MercadoPago SDK + Webhook IPN |
 | **OCR** | Google Cloud Vision (mock fallback) |
 | **PDF** | ReportLab (comprobantes + reportes) |
