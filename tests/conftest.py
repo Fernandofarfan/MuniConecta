@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("SUPABASE_URL", "https://mock.supabase.co")
 os.environ.setdefault("SUPABASE_KEY", "mock-key")
 os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ["DEMO_MODE"] = "false"
 
 
 @pytest.fixture

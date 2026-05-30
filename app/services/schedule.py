@@ -25,9 +25,9 @@ def es_feriado(fecha: date) -> bool:
 
 
 def es_horario_cobrable(fecha_hora: datetime) -> bool:
-    from app.config import DEMO_MODE
+    import os
 
-    if DEMO_MODE:
+    if os.getenv("DEMO_MODE", "true").lower() == "true":
         return True
 
     dia_semana = fecha_hora.weekday()
