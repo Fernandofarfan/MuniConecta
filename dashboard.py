@@ -500,7 +500,7 @@ with t4:
                 if st.form_submit_button("Crear"):
                     res = _api_post("/v1/admin/inspectores", {"legajo": leg, "nombre": nom, "password": pw, "rol": rol})
                     if "error" in res:
-                        st.error(res.get("error", "Error"))
+                        st.error(f"{res.get('error')} (URL: {res.get('url', API_URL + '/v1/admin/inspectores')})")
                     else:
                         st.success("Inspector creado")
                         st.rerun()
