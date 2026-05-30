@@ -372,7 +372,11 @@ with t1:
                         response = model.generate_content(prompt)
                         st.session_state.ia_report = response.text
                 except Exception as e:
-                    st.error(f"Error al contactar Gemini: {e}")
+                    err = str(e)
+                    if "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
+                        st.warning("Gemini: cuota gratuita agotada. Reintenta en unos minutos o usa otra API key.")
+                    else:
+                        st.error(f"Error al contactar Gemini: {err[:200]}")
 
     if st.session_state.ia_report:
         st.success("Reporte generado:")

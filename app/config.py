@@ -24,6 +24,8 @@ TZ_ARG = timezone(timedelta(hours=-3))
 
 DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
 
+USE_MOCK_DB = not SUPABASE_URL or not SUPABASE_KEY
+
 TARIFA_AUTO = 700
 TARIFA_MOTO = 300
 TOLERANCIA_MINUTOS = 5
