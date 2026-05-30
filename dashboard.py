@@ -381,10 +381,10 @@ with t1:
                               f"{porcentaje_digital:.0f}% digital, {pendientes_multas} multas pendientes. "
                               f"Reporte ejecutivo 1 parrafo para el Intendente con accion recomendada.")
                     api_key = os.getenv("GEMINI_API_KEY")
-                    # Prefer legacy SDK (mas estable con API keys gratuitas)
+                    # gemini-2.0-flash es el unico modelo disponible en tier gratuito
                     if _GENAI_SDK == "legacy":
                         _genai_legacy.configure(api_key=api_key)
-                        model = _genai_legacy.GenerativeModel("gemini-1.5-flash")
+                        model = _genai_legacy.GenerativeModel("gemini-2.0-flash")
                         response = model.generate_content(prompt)
                         st.session_state.ia_report = response.text
                     elif _GENAI_SDK == "new":
@@ -395,20 +395,13 @@ with t1:
                         )
                         st.session_state.ia_report = response.text
                     else:
-                        # Fallback: intentar gemini-pro con SDK legacy
-                        try:
-                            _genai_legacy.configure(api_key=api_key)
-                            model = _genai_legacy.GenerativeModel("gemini-pro")
-                            response = model.generate_content(prompt)
-                            st.session_state.ia_report = response.text
-                        except Exception as e2:
-                            st.error(f"Ningun modelo Gemini disponible: {str(e2)[:150]}")
+                        st.error("Instala: pip install google-generativeai")
                 except Exception as e:
                     err = str(e)
-                    if "not found" in err.lower() or "404" in err:
-                        st.warning("Modelo Gemini no disponible. Probablemente la API key no tiene acceso a ese modelo. Usa gemini-2.0-flash en Google AI Studio.")
-                    elif "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
-                        st.warning("Gemini: cuota gratuita agotada. Reintenta en unos minutos o usa otra API key.")
+                    if "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
+                        st.warning("Cuota Gemini agotada. Espera 1-2 horas o crea otra API key en https://aistudio.google.com/apikey")
+                    elif "404" in err or "not found" in err.lower():
+                        st.warning(f"API key sin acceso a Gemini. Crea una key en https://aistudio.google.com/apikey")
                     else:
                         st.error(f"Error Gemini: {err[:200]}")
 
