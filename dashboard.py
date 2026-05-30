@@ -389,15 +389,17 @@ with t1:
                         st.session_state.ia_report = response.text
                     else:
                         _genai_legacy.configure(api_key=GEMINI_API_KEY)
-                        model = _genai_legacy.GenerativeModel("gemini-1.5-flash")
+                        model = _genai_legacy.GenerativeModel("gemini-2.0-flash")
                         response = model.generate_content(prompt)
                         st.session_state.ia_report = response.text
                 except Exception as e:
                     err = str(e)
-                    if "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
+                    if "not found" in err.lower() or "404" in err:
+                        st.warning("Modelo Gemini no disponible. Probablemente la API key no tiene acceso a ese modelo. Usa gemini-2.0-flash en Google AI Studio.")
+                    elif "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
                         st.warning("Gemini: cuota gratuita agotada. Reintenta en unos minutos o usa otra API key.")
                     else:
-                        st.error(f"Error al contactar Gemini: {err[:200]}")
+                        st.error(f"Error Gemini: {err[:200]}")
 
     if st.session_state.ia_report:
         st.success("Reporte generado:")
