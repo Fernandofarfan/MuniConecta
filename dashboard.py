@@ -381,20 +381,28 @@ with t1:
                               f"{porcentaje_digital:.0f}% digital, {pendientes_multas} multas pendientes. "
                               f"Reporte ejecutivo 1 parrafo para el Intendente con accion recomendada.")
                     api_key = os.getenv("GEMINI_API_KEY")
-                    if _GENAI_SDK == "new":
+                    # Prefer legacy SDK (mas estable con API keys gratuitas)
+                    if _GENAI_SDK == "legacy":
+                        _genai_legacy.configure(api_key=api_key)
+                        model = _genai_legacy.GenerativeModel("gemini-1.5-flash")
+                        response = model.generate_content(prompt)
+                        st.session_state.ia_report = response.text
+                    elif _GENAI_SDK == "new":
                         client = _genai_new.Client(api_key=api_key)
                         response = client.models.generate_content(
                             model="models/gemini-2.0-flash",
                             contents=prompt,
                         )
                         st.session_state.ia_report = response.text
-                    elif _GENAI_SDK == "legacy":
-                        _genai_legacy.configure(api_key=api_key)
-                        model = _genai_legacy.GenerativeModel("gemini-1.5-flash")
-                        response = model.generate_content(prompt)
-                        st.session_state.ia_report = response.text
                     else:
-                        st.error("google-genai ni google-generativeai instalados")
+                        # Fallback: intentar gemini-pro con SDK legacy
+                        try:
+                            _genai_legacy.configure(api_key=api_key)
+                            model = _genai_legacy.GenerativeModel("gemini-pro")
+                            response = model.generate_content(prompt)
+                            st.session_state.ia_report = response.text
+                        except Exception as e2:
+                            st.error(f"Ningun modelo Gemini disponible: {str(e2)[:150]}")
                 except Exception as e:
                     err = str(e)
                     if "not found" in err.lower() or "404" in err:
