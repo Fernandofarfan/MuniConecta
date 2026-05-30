@@ -370,25 +370,26 @@ with t1:
         st.session_state.ia_report = None
         
     if st.button("Generar Reporte IA", key="ia_btn"):
-        if not GEMINI_API_KEY:
+        if not os.getenv("GEMINI_API_KEY"):
             st.error(f"GEMINI_API_KEY no encontrada. Ruta .env buscada: {_ENV_PATH}")
         elif _GENAI_SDK is None:
             st.error("Libreria Gemini no instalada. Ejecuta: pip install google-genai")
         else:
-            with st.spinner("Generando reporte con Gemini (esto puede tardar unos segundos)..."):
+            with st.spinner("Generando reporte con Gemini..."):
                 try:
                     prompt = (f"SEM Salta: {vehiculos_activos} activos, ${recaudacion_hoy:,.0f} recaudado, "
                               f"{porcentaje_digital:.0f}% digital, {pendientes_multas} multas pendientes. "
                               f"Reporte ejecutivo 1 parrafo para el Intendente con accion recomendada.")
+                    api_key = os.getenv("GEMINI_API_KEY")
                     if _GENAI_SDK == "new":
-                        client = _genai_new.Client(api_key=GEMINI_API_KEY)
+                        client = _genai_new.Client(api_key=api_key)
                         response = client.models.generate_content(
                             model="gemini-2.0-flash",
                             contents=prompt,
                         )
                         st.session_state.ia_report = response.text
                     else:
-                        _genai_legacy.configure(api_key=GEMINI_API_KEY)
+                        _genai_legacy.configure(api_key=api_key)
                         model = _genai_legacy.GenerativeModel("gemini-2.0-flash")
                         response = model.generate_content(prompt)
                         st.session_state.ia_report = response.text
