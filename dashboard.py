@@ -111,6 +111,9 @@ def _api_post(path, json_data):
 
 def cargar_datos_estacionamientos():
     if not SUPABASE_URL or not SUPABASE_KEY:
+        data = _api_get("/v1/estacionamientos/mock-data")
+        if data:
+            return data
         return []
     r = requests.get(f"{SUPABASE_URL}/rest/v1/estacionamientos?select=*&limit=500", headers=obtener_headers_supabase())
     return r.json() if r.status_code == 200 else []

@@ -288,3 +288,12 @@ async def ciudadano_inicia_estacionamiento(peticion: dict):
         "abono_activo": abono is not None,
         "minutos_saldo_consumidos": minutos_saldo_consumidos,
     }
+
+
+@router.get("/mock-data", include_in_schema=False)
+async def mock_data_dashboard():
+    from app.database import EstacionamientoDB
+    datos = await EstacionamientoDB.obtener_analiticas("2020-01-01", "2099-12-31")
+    if not datos:
+        datos = await EstacionamientoDB.obtener_todos_activos()
+    return datos
