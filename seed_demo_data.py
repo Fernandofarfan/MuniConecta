@@ -2,6 +2,10 @@ import os
 import random
 from datetime import datetime, timedelta, timezone
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 TZ_ARG = timezone(timedelta(hours=-3))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")

@@ -97,7 +97,7 @@ async def iniciar_estacionamiento(
         "estado": "activo",
         "lat": peticion.lat,
         "lon": peticion.lon,
-        "zona_id": peticion.zona_id,
+        "zona_id": zona_id,
     }
 
     await EstacionamientoDB.crear(carga_datos)
@@ -161,6 +161,8 @@ async def calcular_cobro(
         asyncio.create_task(InspectorFinanzasDB.sumar_saldo_adeudado(legajo, comision_municipal))
 
     # Saldo de tiempo a favor: calcular minutos no consumidos
+    import asyncio
+    minutos_sobrantes = 0
     try:
         from datetime import datetime as dt
         hora_inicio_dt = dt.fromisoformat(hora_inicio_str.replace("Z", "+00:00"))
@@ -182,10 +184,9 @@ async def calcular_cobro(
         if minutos_sobrantes > 0 and peticion.metodo_pago == "efectivo":
             asyncio.create_task(VehiculoSaldoDB.acreditar_saldo(peticion.patente, minutos_sobrantes))
     except Exception:
-        minutos_sobrantes = 0  # noqa
+        minutos_sobrantes = 0
 
     await manager.broadcast(json.dumps({"event": "update_dashboard"}))
-    import asyncio
     asyncio.create_task(registrar_auditoria(registro.get("legajo_permisionario", "INSP-01"), "cobrar_estacionamiento", "estacionamiento", registro.get("id", 0), {"patente": peticion.patente, "monto": costo_total}))
     if registro.get("zona_id"):
         asyncio.create_task(notificar_lista_espera(registro["zona_id"]))
@@ -198,7 +199,7 @@ async def calcular_cobro(
         "monto_final": costo_total,
         "metodo_pago": peticion.metodo_pago,
         "link_pago_mp": link_pago_mp,
-        "minutos_sobrantes_acreditados": minutos_sobrantes if 'minutos_sobrantes' in dir() else 0,
+        "minutos_sobrantes_acreditados": minutos_sobrantes,
     }
 
 

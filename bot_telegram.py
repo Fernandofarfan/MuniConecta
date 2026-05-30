@@ -312,30 +312,58 @@ async def _procesar_consulta(update: Update, patente: str):
     import httpx
     async with httpx.AsyncClient() as cliente:
         try:
+            # 1. Consultar estacionamiento activo
             respuesta = await cliente.post(
                 f"{API_URL}/v1/estacionamiento/deuda",
                 json={"patente": patente},
                 headers=_api_headers(),
                 timeout=10.0,
             )
+
+            lineas = [f"Consulta para patente: {patente}"]
+
             if respuesta.status_code == 200:
                 data = respuesta.json()
-                texto = (
-                    f"Patente: {patente}\n"
-                    f"Tiempo transcurrido: {data.get('tiempo_transcurrido_minutos')} min\n"
-                    f"Monto total: ${data.get('monto_total')}\n"
-                    f"Monto con MercadoPago (20% off): ${data.get('monto_con_descuento_digital')}\n"
-                    f"Link de pago: {data.get('link_pago_mp')}"
-                )
+                lineas.append("\n🚗 ESTACIONAMIENTO ACTIVO:")
+                lineas.append(f"  Tiempo: {data.get('tiempo_transcurrido_minutos')} min")
+                lineas.append(f"  Monto actual: ${data.get('monto_total')}")
+                lineas.append(f"  Con MercadoPago (20% off): ${data.get('monto_con_descuento_digital')}")
+                lineas.append(f"  Link de pago: {data.get('link_pago_mp')}")
             elif respuesta.status_code == 404:
-                texto = f"No se encontro un estacionamiento activo para {patente}"
+                lineas.append("\n✅ Sin estacionamiento activo en este momento.")
             elif respuesta.status_code == 422:
-                texto = f"Patente con formato invalido: {patente}"
+                await update.message.reply_text(f"Patente con formato invalido: {patente}")
+                return
             else:
-                texto = f"Error del servidor ({respuesta.status_code})"
+                lineas.append(f"\n⚠️ Error al consultar estacionamiento ({respuesta.status_code})")
+
+            # 2. Consultar multas/infracciones pendientes
+            multas_resp = await cliente.get(
+                f"{API_URL}/v1/infracciones/multas/{patente}",
+                headers=_api_headers(),
+                timeout=10.0,
+            )
+            if multas_resp.status_code == 200:
+                multas_data = multas_resp.json()
+                multas = multas_data.get("multas", [])
+                pendientes = [m for m in multas if m.get("estado") == "pendiente"]
+                total_pendiente = multas_data.get("total_pendiente", 0)
+
+                if pendientes:
+                    lineas.append(f"\n🚨 MULTAS PENDIENTES ({len(pendientes)}):")
+                    for m in pendientes[:5]:
+                        lineas.append(f"  - {m.get('tipo_infraccion', 'N/A')}: ${m.get('monto_multa', 0)}")
+                    lineas.append(f"  Total adeudado: ${total_pendiente}")
+                    lineas.append("\nUsa /apelar ID motivo para apelar una infraccion.")
+                else:
+                    lineas.append("\n✅ Sin multas pendientes.")
+
+            texto = "\n".join(lineas)
+
         except Exception as e:
             logger.error(f"Error consultando API: {e}")
             texto = "Error de conexion con el servidor. Intenta de nuevo mas tarde."
+
     await update.message.reply_text(texto)
 
 

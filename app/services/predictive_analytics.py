@@ -26,7 +26,8 @@ async def predecir_demanda() -> list[dict]:
         zona_hora[(zona_id, hora)].append(r)
 
     predicciones = []
-    for (zona_id, hora), items in sorted(zona_hora.items()):
+    # Usar una clave de ordenamiento segura para evitar errores de tipo al mezclar None, strings y enteros
+    for (zona_id, hora), items in sorted(zona_hora.items(), key=lambda x: (str(x[0][0] or "sin_zona"), x[0][1])):
         promedio = len(items) / 30
         predicciones.append({
             "zona_id": zona_id,

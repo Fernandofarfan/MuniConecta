@@ -1,8 +1,10 @@
 import os
-import google.generativeai as genai
+import pathlib
 from dotenv import load_dotenv
 
-load_dotenv()
+# Cargar .env con ruta absoluta relativa al archivo para garantizar que se encuentre
+_ENV_PATH = pathlib.Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 from datetime import UTC, datetime, timedelta
 
@@ -14,9 +16,22 @@ import requests
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-# Refrescar cada 60 segundos para evitar interrumpir a Gemini
-st_autorefresh(interval=10000, key="data_refresh")
+# set_page_config DEBE ser el primer comando de Streamlit
 st.set_page_config(page_title="SEM Express", page_icon="🚗", layout="wide", initial_sidebar_state="expanded")
+
+# Refrescar cada 60 segundos
+st_autorefresh(interval=60000, key="data_refresh")
+
+# Importar Gemini SDK (nuevo google-genai o fallback a google-generativeai)
+try:
+    from google import genai as _genai_new
+    _GENAI_SDK = "new"
+except ImportError:
+    try:
+        import google.generativeai as _genai_legacy
+        _GENAI_SDK = "legacy"
+    except ImportError:
+        _GENAI_SDK = None
 
 # ── CSS Premium ──
 st.markdown("""
@@ -65,8 +80,6 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 API_KEY = os.getenv("API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
 
 
 def obtener_headers_supabase():
@@ -337,17 +350,30 @@ with t1:
         
     if st.button("Generar Reporte IA", key="ia_btn"):
         if not GEMINI_API_KEY:
-            st.error("Configura GEMINI_API_KEY en tu variable de entorno")
+            st.error(f"GEMINI_API_KEY no encontrada. Ruta .env buscada: {_ENV_PATH}")
+        elif _GENAI_SDK is None:
+            st.error("Libreria Gemini no instalada. Ejecuta: pip install google-genai")
         else:
             with st.spinner("Generando reporte con Gemini (esto puede tardar unos segundos)..."):
                 try:
-                    model = genai.GenerativeModel("gemini-2.5-flash")
-                    prompt = f"SEM Salta: {vehiculos_activos} activos, ${recaudacion_hoy:,.0f} recaudado, {porcentaje_digital:.0f}% digital, {pendientes_multas} multas pendientes. Reporte ejecutivo 1 parrafo para el Intendente con accion recomendada."
-                    response = model.generate_content(prompt)
-                    st.session_state.ia_report = response.text
+                    prompt = (f"SEM Salta: {vehiculos_activos} activos, ${recaudacion_hoy:,.0f} recaudado, "
+                              f"{porcentaje_digital:.0f}% digital, {pendientes_multas} multas pendientes. "
+                              f"Reporte ejecutivo 1 parrafo para el Intendente con accion recomendada.")
+                    if _GENAI_SDK == "new":
+                        client = _genai_new.Client(api_key=GEMINI_API_KEY)
+                        response = client.models.generate_content(
+                            model="gemini-2.0-flash",
+                            contents=prompt,
+                        )
+                        st.session_state.ia_report = response.text
+                    else:
+                        _genai_legacy.configure(api_key=GEMINI_API_KEY)
+                        model = _genai_legacy.GenerativeModel("gemini-1.5-flash")
+                        response = model.generate_content(prompt)
+                        st.session_state.ia_report = response.text
                 except Exception as e:
-                    st.error(f"Ocurrió un error al contactar a la IA: {e}")
-                    
+                    st.error(f"Error al contactar Gemini: {e}")
+
     if st.session_state.ia_report:
         st.success("Reporte generado:")
         st.info(st.session_state.ia_report)
