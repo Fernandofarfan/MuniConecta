@@ -384,15 +384,17 @@ with t1:
                     if _GENAI_SDK == "new":
                         client = _genai_new.Client(api_key=api_key)
                         response = client.models.generate_content(
-                            model="gemini-2.0-flash",
+                            model="models/gemini-2.0-flash",
                             contents=prompt,
                         )
                         st.session_state.ia_report = response.text
-                    else:
+                    elif _GENAI_SDK == "legacy":
                         _genai_legacy.configure(api_key=api_key)
-                        model = _genai_legacy.GenerativeModel("gemini-2.0-flash")
+                        model = _genai_legacy.GenerativeModel("gemini-1.5-flash")
                         response = model.generate_content(prompt)
                         st.session_state.ia_report = response.text
+                    else:
+                        st.error("google-genai ni google-generativeai instalados")
                 except Exception as e:
                     err = str(e)
                     if "not found" in err.lower() or "404" in err:
