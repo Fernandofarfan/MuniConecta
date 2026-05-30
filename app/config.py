@@ -22,6 +22,8 @@ JWT_EXPIRATION_HOURS = 12
 
 TZ_ARG = timezone(timedelta(hours=-3))
 
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+
 TARIFA_AUTO = 700
 TARIFA_MOTO = 300
 TOLERANCIA_MINUTOS = 5

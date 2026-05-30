@@ -25,6 +25,11 @@ def es_feriado(fecha: date) -> bool:
 
 
 def es_horario_cobrable(fecha_hora: datetime) -> bool:
+    from app.config import DEMO_MODE
+
+    if DEMO_MODE:
+        return True
+
     dia_semana = fecha_hora.weekday()
     hora = fecha_hora.time()
     hora_actual = hora.hour + hora.minute / 60.0
